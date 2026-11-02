@@ -1,8 +1,8 @@
-import { cloud } from "./cloud.js?v=0.19.1";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.19.1';
+import { cloud } from "./cloud.js?v=0.19.2";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.19.2';
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.19.1';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.19.2';
 
 let activeRole = portalRole(location.hash);
 function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
