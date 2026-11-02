@@ -33,7 +33,7 @@ v0.12.0 起，學生、教師與維護人員頁首統一顯示「班級公告」
 
 | 身分 | 登入連結 | 功能 |
 | --- | --- | --- |
-| 小老師 | [教師／小老師登入](https://easonlin2013927.github.io/704-class-system/?app=teacher#/teacher/login) | 公告與活動管理，無帳號管理權限 |
+| 小老師 | [小老師登入](https://easonlin2013927.github.io/704-class-system/?app=teacher#/teacher/login) | 公告與活動管理，無帳號管理權限 |
 | 學生 | [學生登入](https://easonlin2013927.github.io/704-class-system/?app=student#/student/login) | 閱讀、搜尋及分類公告 |
 | 教師 | [教師登入](https://easonlin2013927.github.io/704-class-system/?app=teacher#/teacher/login) | 發布、編輯、刪除與置頂公告 |
 | 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-class-system/#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
