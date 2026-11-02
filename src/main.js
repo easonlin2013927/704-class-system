@@ -177,9 +177,14 @@ function toast(message, tone = "success") {
   }, 2600);
 }
 
+let presenceLast=0,presenceUser=null;
+function syncPresence(){const id=state.session?.id;if(!id||document.visibilityState!=='visible')return;if(presenceUser===id&&Date.now()-presenceLast<40000)return;presenceUser=id;presenceLast=Date.now();cloud.presence().catch(()=>{});}
+setInterval(syncPresence,45000);
+document.addEventListener('visibilitychange',syncPresence);
 function render() {
   disposeSchool();
   applyTheme(state.session?.theme || "dark");
+  syncPresence();
   const wallpaper=state.session?.wallpaper_url||'';
   const validWallpaper=/^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/.test(wallpaper);
   document.body.classList.toggle('has-wallpaper',validWallpaper);

@@ -49,6 +49,8 @@ export async function migrateSchool(){await db.query(`
    insert into school_notifications(account_id,kind,title) select new.student_id,'points',case when new.amount>0 then '獲得加分：' else '收到扣分：' end || new.amount::text;
   elsif tg_table_name='school_records' then
    insert into school_notifications(account_id,kind,title) select new.student_id,'feedback',new.title;
+  elsif tg_table_name='school_grades' then
+   insert into school_notifications(account_id,kind,title) select new.student_id,'grades','教師新增了一筆成績' where new.author_id is distinct from new.student_id and exists(select 1 from accounts704 where id=new.author_id and role in ('teacher','admin'));
   end if;return new;
  end $$;
  drop trigger if exists school_notify_announcement on announcements704;
@@ -59,6 +61,8 @@ export async function migrateSchool(){await db.query(`
  create trigger school_notify_points after insert on school_points for each row execute function school_notify_event();
  drop trigger if exists school_notify_records on school_records;
  create trigger school_notify_records after insert on school_records for each row execute function school_notify_event();
+ drop trigger if exists school_notify_grade on school_grades;
+ create trigger school_notify_grade after insert on school_grades for each row execute function school_notify_event();
  create index if not exists school_records_student on school_records(student_id,record_day);
  `);}
 export async function schoolRoutes({path,query,method,user,readBody,send}){

@@ -10,6 +10,7 @@ import {migrateMail,mailAddress,mailStatus,requestMailVerification,confirmMailVe
 import {migrateMailboxes,listMailboxes,createMailbox,updateMailbox,deleteMailbox,confirmMailbox} from './mailboxes.mjs';
 import {migrateMailDeliveries,processMultiMail} from './multi-mail-worker.mjs';
 import {createMailTest,getMailTest,latestMailTest} from './mail-tests.mjs';
+import {migrateMailEvents,markPresence,scheduleWeeklyRanking} from './mail-events.mjs';
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
@@ -39,6 +40,7 @@ await migrateBroadcast();
 await migrateMail();
 await migrateMailboxes();
 await migrateMailDeliveries();
+await migrateMailEvents();
 const generatedPushKeys=webpush.generateVAPIDKeys();
 await db.query('insert into school_push_keys(id,public_key,private_key) values(1,$1,$2) on conflict(id) do nothing',[generatedPushKeys.publicKey,generatedPushKeys.privateKey]);
 const pushKeys=(await db.query('select public_key,private_key from school_push_keys where id=1')).rows[0];
@@ -48,6 +50,8 @@ const pushTimer=setInterval(async()=>{if(pushBusy)return;pushBusy=true;try{const
 pushTimer.unref();
 const broadcastTimer=setInterval(processBroadcasts,3000);broadcastTimer.unref();
 const mailTimer=setInterval(processMultiMail,15000);mailTimer.unref();
+const rankingMailTimer=setInterval(scheduleWeeklyRanking,60000);rankingMailTimer.unref();
+scheduleWeeklyRanking();
 const server = createServer(async (req,res) => {
  const send = (code,data) => { res.writeHead(code,{"Content-Type":"application/json; charset=utf-8"});res.end(JSON.stringify(data)); };
  res.setHeader("Cache-Control","no-store");
@@ -115,6 +119,7 @@ const server = createServer(async (req,res) => {
  if(user.must_change_password) fail(403,"請先變更密碼","PASSWORD_CHANGE_REQUIRED");
  if((user.must_add_email||user.must_change_email)&&!/^\/school\/(mailboxes(?:\/[0-9a-f-]{36})?|mailbox-request|mailbox-confirm)$/.test(path)&&!(user.role==='admin'&&path==='/school/mail-admin/'+user.id))fail(403,'請先完成管理員要求的電子郵件設定','EMAIL_CHANGE_REQUIRED');
  if(path==='/school/mail-address'&&req.method==='GET')return send(200,await mailAddress(user));
+ if(path==='/school/presence'&&req.method==='POST')return send(200,await markPresence(user));
  if(path==='/school/mail-status'&&req.method==='GET')return send(200,await mailStatus(user));
  if(path==='/school/mail-address'&&req.method==='POST'){const b=await body(req);return send(202,await requestMailVerification(user,b.address));}
  if(path==='/school/mail-verify'&&req.method==='POST'){const b=await body(req);return send(200,await confirmMailVerification(user,b.code));}

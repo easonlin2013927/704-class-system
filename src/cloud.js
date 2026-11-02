@@ -2,7 +2,7 @@ import { config } from "./config.js?v=0.19.6";
 let token = null;
 async function request(path, options = {}) {
   if (!config.url) throw new Error("系統尚未設定雲端服務，請聯絡管理員。");
-  const mutation=!!options.method && options.method!=='GET';
+  const mutation=!!options.method && options.method!=='GET' && !options.silent;
   if(mutation)window.dispatchEvent(new Event('operation-start'));
   try {
   let response;
@@ -26,6 +26,7 @@ async function request(path, options = {}) {
   } catch(error) {if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:false,message:error.message}}));throw error;} finally { if(mutation)window.dispatchEvent(new Event('operation-end')); }
 }
 export const cloud = {
+  presence(){return request('/school/presence',{method:'POST',silent:true});},
   school(path,method='GET',value){return request('/school/'+path,{method,...(value===undefined?{}:{body:JSON.stringify(value)})});},
   attachments(post){return request('/school/attachments?post='+encodeURIComponent(post));},
   async uploadAttachment(post,file){if(file.size>200000)throw new Error('單一附件不能超過 200 KB');const entry=await request('/school/attachments',{method:'POST',body:JSON.stringify({announcement_id:post,name:file.name})});try{const bytes=new Uint8Array(await file.arrayBuffer());for(let i=0;i<bytes.length||i===0;i+=100000){const part=bytes.subarray(i,i+100000);let binary='';for(const byte of part)binary+=String.fromCharCode(byte);await request('/school/attachments/'+entry.id,{method:'PATCH',body:JSON.stringify({data:btoa(binary),complete:i+part.length>=bytes.length})});}}catch(e){await request('/school/attachments/'+entry.id,{method:'DELETE'}).catch(()=>{});throw e;}},
