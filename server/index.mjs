@@ -6,6 +6,7 @@ import { verify, digest, hash } from "./password.mjs";
 import { migrateSchool, schoolRoutes } from "./school.mjs";
 import webpush from "web-push";
 import {migrateBroadcast,createBroadcast,getBroadcast,processBroadcasts} from './broadcast.mjs';
+import {migrateMail,mailAddress,mailStatus,requestMailVerification,confirmMailVerification,processMail} from './mail.mjs';
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
@@ -32,14 +33,16 @@ function fail(status, message, code) { throw Object.assign(new Error(message),{s
 await migrate();
 await migrateSchool();
 await migrateBroadcast();
+await migrateMail();
 const generatedPushKeys=webpush.generateVAPIDKeys();
 await db.query('insert into school_push_keys(id,public_key,private_key) values(1,$1,$2) on conflict(id) do nothing',[generatedPushKeys.publicKey,generatedPushKeys.privateKey]);
 const pushKeys=(await db.query('select public_key,private_key from school_push_keys where id=1')).rows[0];
 webpush.setVapidDetails('mailto:admin@example.com',pushKeys.public_key,pushKeys.private_key);
 let pushBusy=false;
-const pushTimer=setInterval(async()=>{if(pushBusy)return;pushBusy=true;try{const pending=await db.query("select n.id,n.title,s.endpoint,s.subscription,a.role from school_notifications n join accounts704 a on a.id=n.account_id join school_push_subscriptions s on s.account_id=n.account_id and n.created_at>=s.created_at left join school_push_delivery d on d.notification_id=n.id and d.endpoint=s.endpoint where d.notification_id is null order by n.id limit 25");for(const item of pending.rows){try{await webpush.sendNotification(item.subscription,JSON.stringify({title:'704班級系統',body:item.title,url:item.role==='student'?'./?app=student#/student/login':item.role==='admin'?'./#/admin/login':'./?app=teacher#/teacher/login'}));await db.query('insert into school_push_delivery(notification_id,endpoint) values($1,$2) on conflict do nothing',[item.id,item.endpoint]);}catch(error){if(error.statusCode===404||error.statusCode===410)await db.query('delete from school_push_subscriptions where endpoint=$1',[item.endpoint]);}}}catch{console.error('Push delivery temporarily unavailable');}finally{pushBusy=false;}},15000);
+const pushTimer=setInterval(async()=>{if(pushBusy)return;pushBusy=true;try{const pending=await db.query("select n.id,n.title,s.endpoint,s.subscription,a.role from school_notifications n join accounts704 a on a.id=n.account_id join school_push_subscriptions s on s.account_id=n.account_id and n.created_at>=s.created_at left join school_push_delivery d on d.notification_id=n.id and d.endpoint=s.endpoint left join school_notification_settings ns on ns.account_id=n.account_id where d.notification_id is null and case n.kind when 'announcements' then coalesce(ns.announcements,true) when 'homework' then coalesce(ns.homework,true) when 'points' then coalesce(ns.points,true) when 'feedback' then coalesce(ns.feedback,true) else true end order by n.id limit 25");for(const item of pending.rows){try{await webpush.sendNotification(item.subscription,JSON.stringify({title:'704班級系統',body:item.title,url:item.role==='student'?'./?app=student#/student/login':item.role==='admin'?'./#/admin/login':'./?app=teacher#/teacher/login'}));await db.query('insert into school_push_delivery(notification_id,endpoint) values($1,$2) on conflict do nothing',[item.id,item.endpoint]);}catch(error){if(error.statusCode===404||error.statusCode===410)await db.query('delete from school_push_subscriptions where endpoint=$1',[item.endpoint]);}}}catch{console.error('Push delivery temporarily unavailable');}finally{pushBusy=false;}},15000);
 pushTimer.unref();
 const broadcastTimer=setInterval(processBroadcasts,3000);broadcastTimer.unref();
+const mailTimer=setInterval(processMail,15000);mailTimer.unref();
 const server = createServer(async (req,res) => {
  const send = (code,data) => { res.writeHead(code,{"Content-Type":"application/json; charset=utf-8"});res.end(JSON.stringify(data)); };
  res.setHeader("Cache-Control","no-store");
@@ -105,6 +108,10 @@ const server = createServer(async (req,res) => {
  }
  if(path==="/me"&&req.method==="GET")return send(200,profile((await db.query("select * from accounts704 where id=$1",[user.id])).rows[0]));
  if(user.must_change_password) fail(403,"請先變更密碼","PASSWORD_CHANGE_REQUIRED");
+ if(path==='/school/mail-address'&&req.method==='GET')return send(200,await mailAddress(user));
+ if(path==='/school/mail-status'&&req.method==='GET')return send(200,await mailStatus(user));
+ if(path==='/school/mail-address'&&req.method==='POST'){const b=await body(req);return send(202,await requestMailVerification(user,b.address));}
+ if(path==='/school/mail-verify'&&req.method==='POST'){const b=await body(req);return send(200,await confirmMailVerification(user,b.code));}
  if(path==='/school/broadcasts'&&req.method==='POST'){const b=await body(req);return send(202,await createBroadcast(user,b.message));}
  if(path==='/school/broadcast-latest'&&req.method==='GET')return send(200,await getBroadcast(user,'latest'));
  const broadcastMatch=path.match(/^\/school\/broadcasts\/(latest|[0-9a-f-]{36})$/i);

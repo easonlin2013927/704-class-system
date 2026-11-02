@@ -1,8 +1,8 @@
-import { cloud } from "./cloud.js?v=0.19.3";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.19.3';
+import { cloud } from "./cloud.js?v=0.19.4";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.19.4';
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.19.3';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.19.4';
 
 let activeRole = portalRole(location.hash);
 function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
@@ -233,6 +233,7 @@ function renderLogin() {
       if ((profile.role === "assistant" ? "teacher" : profile.role) !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
       state.session = { ...profile, name: profile.display_name };
       state.schoolView = 'home';
+      if(!profile.must_change_password){const mail=await cloud.school('mail-address').catch(()=>null);if(mail?.available&&!mail.verified){state.settingsOpen=true;state.settingsTab='notifications';}}
       if(!profile.must_change_password){state.announcements = await cloud.list();state.countdowns = await cloud.countdowns();}
       state.selectedId = null;
       state.editingId = null;
@@ -725,6 +726,11 @@ function renderPersonalization(){
  const form=document.querySelector("#profile-form"),file=document.querySelector("#avatar-file"),message=document.querySelector("#profile-message"),save=document.querySelector("#save-profile");
  form.insertAdjacentHTML('afterend',`<form id="notification-settings" class="editor-card"><h2>通知設定</h2><p>選擇要接收的通知類型。裝置通知需在安裝後開啟，並允許系統通知權限。</p><label class="check-option"><input type="checkbox" name="announcements">公告</label><label class="check-option"><input type="checkbox" name="homework">作業</label><label class="check-option"><input type="checkbox" name="points">加扣分</label><label class="check-option"><input type="checkbox" name="feedback">評語與提醒</label><button class="primary-button">儲存通知設定</button><button class="secondary-button" type="button" id="enable-push">啟用此裝置通知</button><button class="secondary-button" type="button" id="disable-push">停用此裝置通知</button><p role="status" id="notification-settings-message">載入中…</p></form>`);
  const notificationsForm=document.querySelector('#notification-settings'),notificationsMessage=document.querySelector('#notification-settings-message');cloud.school('notification-settings').then(value=>{for(const key of ['announcements','homework','points','feedback'])notificationsForm.elements[key].checked=value[key];notificationsMessage.textContent='';}).catch(error=>{notificationsMessage.textContent=error.message;});notificationsForm.onsubmit=async event=>{event.preventDefault();try{const value={};for(const key of ['announcements','homework','points','feedback'])value[key]=notificationsForm.elements[key].checked;await cloud.school('notification-settings','PUT',value);notificationsMessage.textContent='通知設定已儲存';}catch(error){notificationsMessage.textContent=error.message;}};
+ notificationsForm.insertAdjacentHTML('afterbegin',`<section><h2>必要的電子郵件通知</h2><p>請設定並驗證收信信箱；電子郵件通知固定啟用，下方選項只影響裝置推播。</p><label for="mail-address">收信電子郵件</label><input id="mail-address" type="email" maxlength="254" autocomplete="email" placeholder="name@example.com"><button type="button" class="secondary-button" id="mail-request">寄送驗證碼</button><label for="mail-code">六位數驗證碼</label><input id="mail-code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"><button type="button" class="secondary-button" id="mail-confirm">驗證信箱</button><p id="mail-message" role="status">載入中…</p></section><hr>`);
+ const mailAddressInput=document.querySelector('#mail-address'),mailMessage=document.querySelector('#mail-message');
+ cloud.school('mail-address').then(value=>{if(!mailAddressInput.isConnected)return;mailAddressInput.value=value.address;mailMessage.textContent=!value.available?'寄件服務尚未設定，請聯絡管理員。':value.verified?'信箱已驗證，電子郵件通知已啟用。':'請設定並驗證信箱以接收必要通知。';}).catch(error=>{if(mailMessage.isConnected)mailMessage.textContent=error.message;});
+ document.querySelector('#mail-request').onclick=async event=>{event.currentTarget.disabled=true;try{await cloud.school('mail-address','POST',{address:mailAddressInput.value});mailMessage.textContent='驗證信已加入寄送佇列，請留意信箱及垃圾郵件。';}catch(error){mailMessage.textContent=error.message;}finally{event.currentTarget.disabled=false;}};
+ document.querySelector('#mail-confirm').onclick=async event=>{event.currentTarget.disabled=true;try{await cloud.school('mail-verify','POST',{code:document.querySelector('#mail-code').value.trim()});mailMessage.textContent='信箱已驗證，電子郵件通知已啟用。';}catch(error){mailMessage.textContent=error.message;}finally{event.currentTarget.disabled=false;}};
  document.querySelector('#enable-push').onclick=async()=>{try{if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))throw Error('此裝置不支援推播，請確認已安裝應用程式');const permission=await Notification.requestPermission();if(permission!=='granted')throw Error('尚未允許裝置通知');const registration=await navigator.serviceWorker.register('./service-worker.js');const key=await cloud.school('push-key');const b64=key.public_key.replace(/-/g,'+').replace(/_/g,'/');const bytes=Uint8Array.from(atob(b64+'='.repeat((4-b64.length%4)%4)),c=>c.charCodeAt(0));const subscription=await registration.pushManager.getSubscription()||await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:bytes});await cloud.school('push-subscription','POST',subscription.toJSON());notificationsMessage.textContent='此裝置通知已啟用';}catch(error){notificationsMessage.textContent=error.message;}};
  document.querySelector('#disable-push').onclick=async()=>{try{const registration=await navigator.serviceWorker.getRegistration('./');const subscription=await registration?.pushManager.getSubscription();if(subscription){await cloud.school('push-subscription','DELETE',{endpoint:subscription.endpoint});await subscription.unsubscribe();}notificationsMessage.textContent='此裝置通知已停用';}catch(error){notificationsMessage.textContent=error.message;}};
  form.insertAdjacentHTML('afterend',`<form id="wallpaper-form" class="editor-card"><h2>儀表板桌布</h2><p>可上傳靜態圖片或動態 GIF，檔案大小最多 150 KB。</p><input id="wallpaper-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><div class="school-actions"><button class="primary-button" type="submit">儲存桌布</button><button class="secondary-button" type="button" id="wallpaper-remove">移除桌布</button></div><p id="wallpaper-message" role="status"></p></form>`);
@@ -745,7 +751,7 @@ function renderPersonalization(){
  wallpaperForm.hidden=accountView||notificationView;
  notificationsForm.hidden=!notificationView;
  document.querySelector('.editor-heading h1').textContent=notificationView?'通知':accountView?'帳號管理':'個人化';
- document.querySelector('.editor-heading p').textContent=notificationView?'管理通知類型及裝置通知。':accountView?'管理暱稱、頭像與密碼。':'選擇系統風格與儀表板桌布。';
+ document.querySelector('.editor-heading p').textContent=notificationView?'驗證必要的電子郵件信箱，並管理選用的裝置通知。':accountView?'管理暱稱、頭像與密碼。':'選擇系統風格與儀表板桌布。';
  save.textContent=accountView?'儲存個人資料':'儲存系統風格';
  form.querySelector('.editor-footer span').textContent=accountView?'儲存後套用頭像與暱稱。':'風格可即時預覽，按儲存才會保存到帳號。';
 }
@@ -807,6 +813,8 @@ function renderSiteSettings() {
 function mountBroadcast(){
  const host=document.createElement('section');host.className='editor-card';host.innerHTML=`<h2>全員裝置通知</h2><p>傳送至已啟用推播的管理員、教師、小老師及學生裝置。推播服務接受不代表裝置已顯示通知。</p><label class="editor-label" for="broadcast-message">通知內容</label><textarea id="broadcast-message" maxlength="500" rows="3" placeholder="輸入要傳送的通知內容"></textarea><div class="editor-footer"><span>最多 500 字</span><button id="broadcast-send" class="primary-button">傳送給所有人</button></div><p id="broadcast-status" role="status"></p><div id="broadcast-results"></div>`;
  const anchor=document.querySelector('.system-status');anchor.after(host);let current=null,timer;
+ host.insertAdjacentHTML('beforeend','<h3>電子郵件佇列</h3><p id="mail-queue-status" role="status">載入中…</p>');
+ cloud.school('mail-status').then(x=>{const node=host.querySelector('#mail-queue-status');if(node&&node.isConnected)node.textContent=x.available?`待寄 ${x.pending} 封（其中 ${x.retrying} 封重試中、${x.waiting_verification} 封等待驗證信箱）；寄件服務已接受 ${x.sent} 封。`:'寄件服務尚未設定。';}).catch(error=>{const node=host.querySelector('#mail-queue-status');if(node&&node.isConnected)node.textContent=error.message;});
  const status=host.querySelector('#broadcast-status'),results=host.querySelector('#broadcast-results'),send=host.querySelector('#broadcast-send');
  function show(job){if(!host.isConnected)return;current=job;if(!job){status.textContent='尚無全員通知紀錄。';return;}const rows=summarize(job);status.textContent=`通知內容：${job.message}　｜　建立時間：${new Date(job.created_at).toLocaleString('zh-TW')}`;results.innerHTML=`<div class="table-scroll"><table class="status-table"><thead><tr><th>姓名</th><th>身分</th><th>狀態</th><th>裝置數</th><th>已接受／失敗／處理中</th><th>原因</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${escapeHtml(x.name)}</td><td>${escapeHtml(x.role)}</td><td><span class="broadcast-${x.status}">${escapeHtml(x.label)}</span></td><td>${x.devices}</td><td>${x.accepted}／${x.failed}／${x.pending}</td><td>${escapeHtml(x.reasons.join('；')||'—')}</td></tr>`).join('')}</tbody></table></div><p class="muted">「已接受」表示推播服務接受請求，無法確認裝置是否實際顯示。</p><button id="broadcast-export" class="secondary-button">匯出 Excel</button>`;host.querySelector('#broadcast-export').onclick=()=>exportBroadcast(current,summarize(current));if(rows.some(x=>x.pending))timer=setTimeout(()=>load(job.id),3000);}
  async function load(id){try{show(await cloud.school(id?'broadcasts/'+encodeURIComponent(id):'broadcast-latest'));}catch(error){if(host.isConnected)status.textContent=error.message;}}
@@ -816,4 +824,4 @@ function mountBroadcast(){
 
 render();
 refreshBanner();
-if(activeRole==='admin'||isPwaWindow())cloud.me().then(async profile=>{if((profile.role==='assistant'?'teacher':profile.role)!==activeRole)return;state.session={...profile,name:profile.display_name};if(!profile.must_change_password){state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();}render();}).catch(()=>{});
+if(activeRole==='admin'||isPwaWindow())cloud.me().then(async profile=>{if((profile.role==='assistant'?'teacher':profile.role)!==activeRole)return;state.session={...profile,name:profile.display_name};if(!profile.must_change_password){state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();const mail=await cloud.school('mail-address').catch(()=>null);if(mail?.available&&!mail.verified){state.settingsOpen=true;state.settingsTab='notifications';}}render();}).catch(()=>{});

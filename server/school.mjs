@@ -42,13 +42,13 @@ export async function migrateSchool(){await db.query(`
  create or replace function school_notify_event() returns trigger language plpgsql as $$
  begin
   if tg_table_name='announcements704' then
-   insert into school_notifications(account_id,kind,title) select a.id,'announcements',new.title from accounts704 a left join school_notification_settings s on s.account_id=a.id where not a.disabled and a.id is distinct from new.author_id and coalesce(s.announcements,true) and (new.audience='全部人員' or (new.audience='學生' and a.role='student') or (new.audience='教師' and a.role in ('teacher','assistant','admin')));
+   insert into school_notifications(account_id,kind,title) select a.id,'announcements',new.title from accounts704 a where not a.disabled and a.id is distinct from new.author_id and (new.audience='全部人員' or (new.audience='學生' and a.role='student') or (new.audience='教師' and a.role in ('teacher','assistant','admin')));
   elsif tg_table_name='school_homework' then
-   insert into school_notifications(account_id,kind,title) select a.id,'homework',new.title from accounts704 a left join school_notification_settings s on s.account_id=a.id where a.role='student' and not a.disabled and coalesce(s.homework,true) and (new.recipients is null or a.id=any(new.recipients));
+   insert into school_notifications(account_id,kind,title) select a.id,'homework',new.title from accounts704 a where a.role='student' and not a.disabled and (new.recipients is null or a.id=any(new.recipients));
   elsif tg_table_name='school_points' then
-   insert into school_notifications(account_id,kind,title) select new.student_id,'points',case when new.amount>0 then '獲得加分：' else '收到扣分：' end || new.amount::text where coalesce((select points from school_notification_settings where account_id=new.student_id),true);
+   insert into school_notifications(account_id,kind,title) select new.student_id,'points',case when new.amount>0 then '獲得加分：' else '收到扣分：' end || new.amount::text;
   elsif tg_table_name='school_records' then
-   insert into school_notifications(account_id,kind,title) select new.student_id,'feedback',new.title where coalesce((select feedback from school_notification_settings where account_id=new.student_id),true);
+   insert into school_notifications(account_id,kind,title) select new.student_id,'feedback',new.title;
   end if;return new;
  end $$;
  drop trigger if exists school_notify_announcement on announcements704;
