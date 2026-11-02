@@ -1,4 +1,4 @@
-import { cloud } from './cloud.js?v=0.19.7';
+import { cloud } from './cloud.js?v=0.19.8';
 let poll=null;
 export function disposeSchool(){if(poll)clearInterval(poll);poll=null;}
 const esc=(s='')=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

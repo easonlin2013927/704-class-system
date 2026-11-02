@@ -20,6 +20,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.19.7 >/dev/null 2>&1; then
-            gh release create v0.19.7 --target "$GITHUB_SHA" --title "v0.19.7 活動郵件與排行榜通知" --notes-file deploy/RELEASE.md
+          if ! gh release view v0.19.8 >/dev/null 2>&1; then
+            gh release create v0.19.8 --target "$GITHUB_SHA" --title "v0.19.8 精簡通知名單介面" --notes-file deploy/RELEASE.md
           fi

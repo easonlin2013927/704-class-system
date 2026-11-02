@@ -1,10 +1,10 @@
-import { cloud } from "./cloud.js?v=0.19.7";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.19.7';
-import {mountMailboxes} from './mailboxes.js?v=0.19.7';
-import {mountMailTest} from './mail-test.js?v=0.19.7';
+import { cloud } from "./cloud.js?v=0.19.8";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.19.8';
+import {mountMailboxes} from './mailboxes.js?v=0.19.8';
+import {mountMailTest} from './mail-test.js?v=0.19.8';
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.19.7';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.19.8';
 
 let activeRole = portalRole(location.hash);
 function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
@@ -831,7 +831,7 @@ function mountBroadcast(){
  host.insertAdjacentHTML('beforeend','<section class="editor-card" id="mail-test-section"></section>');mountMailTest(host.querySelector('#mail-test-section'));
  cloud.school('mail-status').then(x=>{const node=host.querySelector('#mail-queue-status');if(node&&node.isConnected)node.textContent=x.available?`待寄 ${x.pending} 封（其中 ${x.retrying} 封重試中、${x.waiting_verification} 封等待驗證信箱）；寄件服務已接受 ${x.sent} 封。`:'寄件服務尚未設定。';}).catch(error=>{const node=host.querySelector('#mail-queue-status');if(node&&node.isConnected)node.textContent=error.message;});
  const status=host.querySelector('#broadcast-status'),results=host.querySelector('#broadcast-results'),send=host.querySelector('#broadcast-send');
- function show(job){if(!host.isConnected)return;current=job;if(!job){status.textContent='尚無全員通知紀錄。';return;}const rows=summarize(job);status.textContent=`通知內容：${job.message}　｜　建立時間：${new Date(job.created_at).toLocaleString('zh-TW')}`;results.innerHTML=`<div class="table-scroll"><table class="status-table"><thead><tr><th>姓名</th><th>身分</th><th>狀態</th><th>裝置數</th><th>已接受／失敗／處理中</th><th>原因</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${escapeHtml(x.name)}</td><td>${escapeHtml(x.role)}</td><td><span class="broadcast-${x.status}">${escapeHtml(x.label)}</span></td><td>${x.devices}</td><td>${x.accepted}／${x.failed}／${x.pending}</td><td>${escapeHtml(x.reasons.join('；')||'—')}</td></tr>`).join('')}</tbody></table></div><p class="muted">「已接受」表示推播服務接受請求，無法確認裝置是否實際顯示。</p><button id="broadcast-export" class="secondary-button">匯出 Excel</button>`;host.querySelector('#broadcast-export').onclick=()=>exportBroadcast(current,summarize(current));if(rows.some(x=>x.pending))timer=setTimeout(()=>load(job.id),3000);}
+ function show(job){if(!host.isConnected)return;current=job;if(!job){status.textContent='尚無全員通知紀錄。';results.replaceChildren();return;}const rows=summarize(job);status.textContent=`通知內容：${job.message}　｜　建立時間：${new Date(job.created_at).toLocaleString('zh-TW')}　｜　${rows.length} 位收件人`;results.innerHTML='<button id="broadcast-export" class="secondary-button">匯出 Excel</button>';host.querySelector('#broadcast-export').onclick=()=>exportBroadcast(current,summarize(current));if(rows.some(x=>x.pending))timer=setTimeout(()=>load(job.id),3000);}
  async function load(id){try{show(await cloud.school(id?'broadcasts/'+encodeURIComponent(id):'broadcast-latest'));}catch(error){if(host.isConnected)status.textContent=error.message;}}
  send.onclick=async()=>{const message=host.querySelector('#broadcast-message').value.trim();if(!message){status.textContent='請輸入通知內容。';return;}send.disabled=true;clearTimeout(timer);try{const job=await cloud.school('broadcasts','POST',{message});host.querySelector('#broadcast-message').value='';await load(job.id);}catch(error){status.textContent=error.message;}finally{send.disabled=false;}};
  load();
