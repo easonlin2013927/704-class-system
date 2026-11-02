@@ -113,7 +113,7 @@ const server = createServer(async (req,res) => {
  }
  if(path==="/me"&&req.method==="GET")return send(200,profile((await db.query("select * from accounts704 where id=$1",[user.id])).rows[0]));
  if(user.must_change_password) fail(403,"請先變更密碼","PASSWORD_CHANGE_REQUIRED");
- if((user.must_add_email||user.must_change_email)&&!/^\/school\/(mailboxes(?:\/[0-9a-f-]{36})?|mailbox-request|mailbox-confirm)$/.test(path))fail(403,'請先完成管理員要求的電子郵件設定','EMAIL_CHANGE_REQUIRED');
+ if((user.must_add_email||user.must_change_email)&&!/^\/school\/(mailboxes(?:\/[0-9a-f-]{36})?|mailbox-request|mailbox-confirm)$/.test(path)&&!(user.role==='admin'&&path==='/school/mail-admin/'+user.id))fail(403,'請先完成管理員要求的電子郵件設定','EMAIL_CHANGE_REQUIRED');
  if(path==='/school/mail-address'&&req.method==='GET')return send(200,await mailAddress(user));
  if(path==='/school/mail-status'&&req.method==='GET')return send(200,await mailStatus(user));
  if(path==='/school/mail-address'&&req.method==='POST'){const b=await body(req);return send(202,await requestMailVerification(user,b.address));}
@@ -127,6 +127,7 @@ const server = createServer(async (req,res) => {
  if(path==='/school/mailbox-confirm'&&req.method==='POST'){const b=await body(req);return send(200,await confirmMailbox(user,b.code));}
  const adminMailboxMatch=path.match(/^\/school\/mail-admin\/([0-9a-f-]{36})$/i);
  if(adminMailboxMatch&&req.method==='GET')return send(200,await listMailboxes(user,adminMailboxMatch[1]));
+ if(adminMailboxMatch&&req.method==='POST'){if(user.role!=='admin')fail(403,'僅限管理員');const b=await body(req);return send(201,await createMailbox(user,b.address,adminMailboxMatch[1]));}
  if(path==='/school/mail-tests'&&req.method==='POST')return send(202,await createMailTest(user));
  if(path==='/school/mail-test-latest'&&req.method==='GET')return send(200,await latestMailTest(user));
  const mailTestMatch=path.match(/^\/school\/mail-tests\/([0-9a-f-]{36})$/i);

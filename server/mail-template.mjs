@@ -1,0 +1,13 @@
+const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const site='https://easonlin2013927.github.io/704-class-system/';
+export function buildMail(row){
+ const verification=Boolean(row.verification),test=row.kind==='test',broadcast=row.kind==='broadcast';
+ const heading=verification?'驗證你的電子郵件':test?'測試郵件':'你有一則班級通知';
+ const detail=verification?'請在系統的驗證畫面輸入下方六位數驗證碼，驗證碼有效 5 分鐘。':test?'這是一封來自 704 班級系統的測試郵件。':broadcast?'管理員發布了一則通知：':'請登入班級系統查看詳細內容。';
+ const message=broadcast?String(row.title||''):'';
+ const code=verification?String(row.verification_code||''):'';
+ const subject=verification?'704班級系統：驗證通知信箱':test?'704班級系統：測試郵件':'704班級系統：你有新的通知';
+ const text=['704班級系統',heading,detail,message,code?`驗證碼：${code}`:'',site].filter(Boolean).join('\n\n');
+ const html=`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(subject)}</title></head><body style="margin:0;padding:0;background:#f2f0fa;font-family:Arial,'Noto Sans TC',sans-serif;color:#272438"><table role="presentation" style="width:100%;border-collapse:collapse;background:#f2f0fa"><tr><td align="center" style="padding:32px 14px"><table role="presentation" style="width:100%;max-width:560px;border-collapse:collapse;background:#ffffff;border-radius:18px;overflow:hidden"><tr><td style="background:#604bc0;padding:25px 32px;color:#ffffff;font-size:18px;font-weight:bold">● &nbsp;704班級系統</td></tr><tr><td style="padding:36px 32px"><div style="font-size:12px;letter-spacing:2px;color:#7666b8;font-weight:bold">CLASS NOTIFICATION</div><h1 style="font-size:25px;line-height:1.4;margin:12px 0 18px;color:#28233b">${escapeHtml(heading)}</h1><p style="font-size:16px;line-height:1.8;color:#5c5770">${escapeHtml(detail)}</p>${message?`<div style="padding:16px 18px;background:#f4f2fb;border-left:4px solid #8068de;border-radius:8px;line-height:1.7;white-space:pre-wrap">${escapeHtml(message)}</div>`:''}${code?`<div style="margin:24px 0;padding:20px;background:#f1edff;border-radius:12px;text-align:center;color:#4d3aa0;font-size:30px;letter-spacing:8px;font-weight:bold">${escapeHtml(code)}</div>`:''}<p style="margin:30px 0 0"><a href="${site}" style="display:inline-block;background:#6953c8;color:#fff;text-decoration:none;font-weight:bold;padding:13px 24px;border-radius:10px">前往班級系統 →</a></p></td></tr><tr><td style="padding:20px 32px;background:#faf9fe;color:#817b91;font-size:12px;line-height:1.7">這封信由 704 班級系統自動寄出。請勿回覆此郵件。</td></tr></table></td></tr></table></body></html>`;
+ return {subject,text,html};
+}

@@ -1,10 +1,10 @@
-import { cloud } from "./cloud.js?v=0.19.5";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.19.5';
-import {mountMailboxes} from './mailboxes.js?v=0.19.5';
-import {mountMailTest} from './mail-test.js?v=0.19.5';
+import { cloud } from "./cloud.js?v=0.19.6";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.19.6';
+import {mountMailboxes} from './mailboxes.js?v=0.19.6';
+import {mountMailTest} from './mail-test.js?v=0.19.6';
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.19.5';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.19.6';
 
 let activeRole = portalRole(location.hash);
 function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
@@ -728,7 +728,7 @@ function renderStudentAccount(){
  document.querySelector('.editor-heading h1').textContent='帳號管理';
  const form=document.querySelector('#profile-form');
  form.insertAdjacentHTML('afterend','<section id="personal-mailboxes" class="editor-card"></section>');
- mountMailboxes(document.querySelector('#personal-mailboxes'),null,async()=>{const profile=await cloud.me();state.session={...state.session,...profile,name:profile.display_name};if(!profile.must_add_email&&!profile.must_change_email){state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();render();}},state.session.must_change_email);
+ mountMailboxes(document.querySelector('#personal-mailboxes'),state.session.role==='admin'?state.session.id:null,async()=>{const profile=await cloud.me();state.session={...state.session,...profile,name:profile.display_name};if(!profile.must_add_email&&!profile.must_change_email){state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();render();}},state.session.must_change_email);
  if(state.session.must_add_email||state.session.must_change_email)document.querySelector('#personal-mailboxes').insertAdjacentHTML('afterbegin','<p role="alert">管理員要求你先新增或變更指定的電子郵件並完成驗證。</p>');
  form.insertAdjacentHTML('afterend',`<form id="student-password" class="editor-card"><h2>變更密碼</h2><label>目前密碼<input name="current_password" type="password" autocomplete="current-password" required></label><label>新密碼<input name="new_password" type="password" autocomplete="new-password" required></label><label>確認新密碼<input name="confirmation" type="password" autocomplete="new-password" required></label><p id="student-password-message" role="status"></p><button class="primary-button" type="submit">變更密碼</button></form>`);
  document.querySelector('#student-password').addEventListener('submit',async event=>{event.preventDefault();const f=event.currentTarget,d=new FormData(f),message=document.querySelector('#student-password-message'),button=f.querySelector('button');if(d.get('new_password')!==d.get('confirmation')){message.textContent='兩次輸入的新密碼不相同';return;}button.disabled=true;try{const profile=await cloud.changePassword({current_password:d.get('current_password'),new_password:d.get('new_password')});state.session={...state.session,...profile,name:profile.display_name};f.reset();message.textContent='密碼已更新';}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
