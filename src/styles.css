@@ -129,6 +129,7 @@ label { display: block; color: #344054; font-size: 14px; font-weight: 600; }.log
 .status-table th,.status-table td { border:1px solid #ffffff14; padding:13px 18px; overflow-wrap:anywhere; }
 .status-table thead,.status-table tbody th { background:#ffffff04; }
 .status-table tbody th { width:35%; color:#b9b0c8; font-weight:500; }
+.broadcast-accepted { color:#5ed9a4; } .broadcast-failed { color:#ff8f98; } .broadcast-partial,.broadcast-pending { color:#f3c76a; } .broadcast-not_enabled,.broadcast-disabled { color:#a9a4b5; }
 .system-status { margin-bottom:24px; }
 .top-actions { flex-wrap:wrap; }
 @media(max-width:700px){.topbar {height:auto!important; min-height:76px; padding-top:12px; padding-bottom:12px; gap:10px; flex-wrap:wrap;}.top-actions {width:100%; justify-content:flex-end;}.top-actions .user-block {display:none;}.create-menu {align-self:flex-end;}.hero-row .create-menu .primary-button {width:auto;} }

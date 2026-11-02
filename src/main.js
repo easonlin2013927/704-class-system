@@ -1,7 +1,8 @@
-import { cloud } from "./cloud.js?v=0.19.0";
+import { cloud } from "./cloud.js?v=0.19.1";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.19.1';
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.19.0';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.19.1';
 
 let activeRole = portalRole(location.hash);
 function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
@@ -764,6 +765,7 @@ function renderSiteSettings() {
       ${state.session.role === "admin" ? `<hr><h2>網站頂端跑馬公告</h2><label class="switch-row"><input id="marquee-enabled" type="checkbox"><span class="switch"></span><span><strong>顯示全站跑馬公告</strong><small>公告會顯示在登入頁與已登入頁面的最上方。</small></span></label><label class="editor-label" for="marquee-content">跑馬公告文字</label><textarea id="marquee-content" maxlength="1000" rows="3" placeholder="輸入要公告給全站的短訊息"></textarea><div class="editor-footer"><span>最多 1000 字；停用後內容仍會保留。</span><button id="save-marquee" class="secondary-button">儲存跑馬公告</button></div>` : ""}
     </div></section></main>`;
   bindHeader();bindSettingsTabs();
+  if(state.session.role==='admin') mountBroadcast();
   document.querySelector("#close-settings").addEventListener("click",goHome);
   bindStatusTable();
   const message = document.querySelector("#settings-message");
@@ -800,6 +802,16 @@ function renderSiteSettings() {
     } catch (error) { message.textContent = error.message; }
     finally { button.disabled = false; }
   });
+}
+
+function mountBroadcast(){
+ const host=document.createElement('section');host.className='editor-card';host.innerHTML=`<h2>全員裝置通知</h2><p>傳送至已啟用推播的管理員、教師、小老師及學生裝置。推播服務接受不代表裝置已顯示通知。</p><label class="editor-label" for="broadcast-message">通知內容</label><textarea id="broadcast-message" maxlength="500" rows="3" placeholder="輸入要傳送的通知內容"></textarea><div class="editor-footer"><span>最多 500 字</span><button id="broadcast-send" class="primary-button">傳送給所有人</button></div><p id="broadcast-status" role="status"></p><div id="broadcast-results"></div>`;
+ const anchor=document.querySelector('.system-status');anchor.after(host);let current=null,timer;
+ const status=host.querySelector('#broadcast-status'),results=host.querySelector('#broadcast-results'),send=host.querySelector('#broadcast-send');
+ function show(job){if(!host.isConnected)return;current=job;if(!job){status.textContent='尚無全員通知紀錄。';return;}const rows=summarize(job);status.textContent=`通知內容：${job.message}　｜　建立時間：${new Date(job.created_at).toLocaleString('zh-TW')}`;results.innerHTML=`<div class="table-scroll"><table class="status-table"><thead><tr><th>姓名</th><th>身分</th><th>狀態</th><th>裝置數</th><th>已接受／失敗／處理中</th><th>原因</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${escapeHtml(x.name)}</td><td>${escapeHtml(x.role)}</td><td><span class="broadcast-${x.status}">${escapeHtml(x.label)}</span></td><td>${x.devices}</td><td>${x.accepted}／${x.failed}／${x.pending}</td><td>${escapeHtml(x.reasons.join('；')||'—')}</td></tr>`).join('')}</tbody></table></div><p class="muted">「已接受」表示推播服務接受請求，無法確認裝置是否實際顯示。</p><button id="broadcast-export" class="secondary-button">匯出 Excel</button>`;host.querySelector('#broadcast-export').onclick=()=>exportBroadcast(current,summarize(current));if(rows.some(x=>x.pending))timer=setTimeout(()=>load(job.id),3000);}
+ async function load(id){try{show(await cloud.school(id?'broadcasts/'+encodeURIComponent(id):'broadcast-latest'));}catch(error){if(host.isConnected)status.textContent=error.message;}}
+ send.onclick=async()=>{const message=host.querySelector('#broadcast-message').value.trim();if(!message){status.textContent='請輸入通知內容。';return;}send.disabled=true;clearTimeout(timer);try{const job=await cloud.school('broadcasts','POST',{message});host.querySelector('#broadcast-message').value='';await load(job.id);}catch(error){status.textContent=error.message;}finally{send.disabled=false;}};
+ load();
 }
 
 render();
