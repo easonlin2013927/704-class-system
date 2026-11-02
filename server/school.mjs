@@ -45,8 +45,8 @@ export async function migrateSchool(){await db.query(`
    insert into school_notifications(account_id,kind,title) select a.id,'announcements',new.title from accounts704 a where not a.disabled and a.id is distinct from new.author_id and (new.audience='全部人員' or (new.audience='學生' and a.role='student') or (new.audience='教師' and a.role in ('teacher','assistant','admin')));
   elsif tg_table_name='school_homework' then
    insert into school_notifications(account_id,kind,title) select a.id,'homework',new.title from accounts704 a where a.role='student' and not a.disabled and (new.recipients is null or a.id=any(new.recipients));
-  elsif tg_table_name='school_points' then
-   insert into school_notifications(account_id,kind,title) select new.student_id,'points',case when new.amount>0 then '獲得加分：' else '收到扣分：' end || new.amount::text;
+  elsif tg_table_name='countdowns704' then
+   insert into school_notifications(account_id,kind,title) select a.id,'activity',new.title from accounts704 a where a.role='student' and not a.disabled;
   elsif tg_table_name='school_records' then
    insert into school_notifications(account_id,kind,title) select new.student_id,'feedback',new.title;
   elsif tg_table_name='school_grades' then
@@ -58,7 +58,8 @@ export async function migrateSchool(){await db.query(`
  drop trigger if exists school_notify_homework on school_homework;
  create trigger school_notify_homework after insert on school_homework for each row execute function school_notify_event();
  drop trigger if exists school_notify_points on school_points;
- create trigger school_notify_points after insert on school_points for each row execute function school_notify_event();
+ drop trigger if exists school_notify_activity on countdowns704;
+ create trigger school_notify_activity after insert on countdowns704 for each row execute function school_notify_event();
  drop trigger if exists school_notify_records on school_records;
  create trigger school_notify_records after insert on school_records for each row execute function school_notify_event();
  drop trigger if exists school_notify_grade on school_grades;

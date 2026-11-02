@@ -2,7 +2,7 @@ const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<
 const site='https://easonlin2013927.github.io/704-class-system/';
 export function buildMail(row){
  const verification=Boolean(row.verification),test=row.kind==='test',broadcast=row.kind==='broadcast',weekly=row.kind==='ranking',chat=row.kind==='offline-chat';
- const heading=verification?'驗證你的電子郵件':test?'測試郵件':weekly?'每週班級排行榜':chat?'你有新的聊天訊息':({'announcements':'有新的公告','homework':'有新的作業','points':'你的班級積分有更新','feedback':'有新的提醒或缺交紀錄','grades':'教師新增了一筆成績','report':'檢舉進度有更新'}[row.event_kind]||'你有一則班級通知');
+ const heading=verification?'驗證你的電子郵件':test?'測試郵件':weekly?'每週班級排行榜':chat?'你有新的聊天訊息':({'announcements':'有新的公告','activity':'有新的活動','homework':'有新的作業','feedback':'有新的提醒或缺交紀錄','grades':'教師新增了一筆成績','report':'檢舉進度有更新'}[row.event_kind]||'你有一則班級通知');
  const detail=verification?'請在系統的驗證畫面輸入下方六位數驗證碼，驗證碼有效 5 分鐘。':test?'這是一封來自 704 班級系統的測試郵件。':broadcast?'管理員發布了一則通知：':weekly?'以下是本週五晚間的班級排行榜。':chat?'你離開系統時收到了新訊息，請登入查看。':'請登入班級系統查看詳細內容。';
  const message=broadcast?String(row.title||''):'';
  const code=verification?String(row.verification_code||''):'';

@@ -7,7 +7,8 @@ export async function migrateMailEvents(){await db.query(`
  insert into school_mail_schedules(name) values('weekly-ranking') on conflict do nothing;
  create table if not exists school_mail_weekly_runs(week_start date primary key,created_at timestamptz not null default now());
  alter table school_mail_queue add column if not exists event_kind text;
- create or replace function school_queue_mail_notification() returns trigger language plpgsql as $$ begin insert into school_mail_queue(id,account_id,kind,title,event_kind) values(gen_random_uuid(),new.account_id,'notification',new.title,new.kind);return new;end $$;
+ create or replace function school_queue_mail_notification() returns trigger language plpgsql as $$ begin if new.kind<>'points' then insert into school_mail_queue(id,account_id,kind,title,event_kind) values(gen_random_uuid(),new.account_id,'notification',new.title,new.kind);end if;return new;end $$;
+ update school_mail_queue set status='cancelled' where kind='notification' and event_kind='points' and status='pending';
  create or replace function school_offline_message_email() returns trigger language plpgsql as $$
  begin
   with due as (
