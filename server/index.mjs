@@ -6,13 +6,16 @@ import { verify, digest, hash } from "./password.mjs";
 import { migrateSchool, schoolRoutes } from "./school.mjs";
 import webpush from "web-push";
 import {migrateBroadcast,createBroadcast,getBroadcast,processBroadcasts} from './broadcast.mjs';
-import {migrateMail,mailAddress,mailStatus,requestMailVerification,confirmMailVerification,processMail} from './mail.mjs';
+import {migrateMail,mailAddress,mailStatus,requestMailVerification,confirmMailVerification} from './mail.mjs';
+import {migrateMailboxes,listMailboxes,createMailbox,updateMailbox,deleteMailbox,confirmMailbox} from './mailboxes.mjs';
+import {migrateMailDeliveries,processMultiMail} from './multi-mail-worker.mjs';
+import {createMailTest,getMailTest,latestMailTest} from './mail-tests.mjs';
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
 const categories = new Set(["important","academic","activity","general"]);
 const themes=new Set(["dark","light","ocean","forest","rose","amber","midnight"]);
-function profile(account){return {id:account.id,role:account.role,display_name:account.display_name,must_change_password:account.must_change_password,nickname:account.nickname,theme:account.theme,avatar_url:account.avatar_url,wallpaper_url:account.wallpaper_url};}
+function profile(account){return {id:account.id,role:account.role,display_name:account.display_name,must_change_password:account.must_change_password,must_add_email:account.must_add_email,must_change_email:account.must_change_email,nickname:account.nickname,theme:account.theme,avatar_url:account.avatar_url,wallpaper_url:account.wallpaper_url};}
 function validAvatar(value){
  if(value==="")return true;
  if(typeof value!=="string"||value.length>220000)return false;
@@ -34,6 +37,8 @@ await migrate();
 await migrateSchool();
 await migrateBroadcast();
 await migrateMail();
+await migrateMailboxes();
+await migrateMailDeliveries();
 const generatedPushKeys=webpush.generateVAPIDKeys();
 await db.query('insert into school_push_keys(id,public_key,private_key) values(1,$1,$2) on conflict(id) do nothing',[generatedPushKeys.publicKey,generatedPushKeys.privateKey]);
 const pushKeys=(await db.query('select public_key,private_key from school_push_keys where id=1')).rows[0];
@@ -42,7 +47,7 @@ let pushBusy=false;
 const pushTimer=setInterval(async()=>{if(pushBusy)return;pushBusy=true;try{const pending=await db.query("select n.id,n.title,s.endpoint,s.subscription,a.role from school_notifications n join accounts704 a on a.id=n.account_id join school_push_subscriptions s on s.account_id=n.account_id and n.created_at>=s.created_at left join school_push_delivery d on d.notification_id=n.id and d.endpoint=s.endpoint left join school_notification_settings ns on ns.account_id=n.account_id where d.notification_id is null and case n.kind when 'announcements' then coalesce(ns.announcements,true) when 'homework' then coalesce(ns.homework,true) when 'points' then coalesce(ns.points,true) when 'feedback' then coalesce(ns.feedback,true) else true end order by n.id limit 25");for(const item of pending.rows){try{await webpush.sendNotification(item.subscription,JSON.stringify({title:'704班級系統',body:item.title,url:item.role==='student'?'./?app=student#/student/login':item.role==='admin'?'./#/admin/login':'./?app=teacher#/teacher/login'}));await db.query('insert into school_push_delivery(notification_id,endpoint) values($1,$2) on conflict do nothing',[item.id,item.endpoint]);}catch(error){if(error.statusCode===404||error.statusCode===410)await db.query('delete from school_push_subscriptions where endpoint=$1',[item.endpoint]);}}}catch{console.error('Push delivery temporarily unavailable');}finally{pushBusy=false;}},15000);
 pushTimer.unref();
 const broadcastTimer=setInterval(processBroadcasts,3000);broadcastTimer.unref();
-const mailTimer=setInterval(processMail,15000);mailTimer.unref();
+const mailTimer=setInterval(processMultiMail,15000);mailTimer.unref();
 const server = createServer(async (req,res) => {
  const send = (code,data) => { res.writeHead(code,{"Content-Type":"application/json; charset=utf-8"});res.end(JSON.stringify(data)); };
  res.setHeader("Cache-Control","no-store");
@@ -83,7 +88,7 @@ const server = createServer(async (req,res) => {
  return send(200,{token,remembered:data.remember===true,profile:profile(account)});
  }
  const token = req.headers.authorization?.replace(/^Bearer /,"") || "";
- const user = (await db.query("select a.id,a.role,a.display_name,a.must_change_password from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now() and not a.disabled",[digest(token)])).rows[0];
+ const user = (await db.query("select a.id,a.role,a.display_name,a.must_change_password,a.must_add_email,a.must_change_email from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now() and not a.disabled",[digest(token)])).rows[0];
  if (!user) fail(401,"登入已失效，請重新登入");
  if (path === "/logout" && req.method === "POST") { await db.query("delete from sessions704 where token_hash=$1",[digest(token)]); return send(200,{ok:true}); }
  if(path === "/account/password" && req.method === "POST"){
@@ -108,10 +113,24 @@ const server = createServer(async (req,res) => {
  }
  if(path==="/me"&&req.method==="GET")return send(200,profile((await db.query("select * from accounts704 where id=$1",[user.id])).rows[0]));
  if(user.must_change_password) fail(403,"請先變更密碼","PASSWORD_CHANGE_REQUIRED");
+ if((user.must_add_email||user.must_change_email)&&!/^\/school\/(mailboxes(?:\/[0-9a-f-]{36})?|mailbox-request|mailbox-confirm)$/.test(path))fail(403,'請先完成管理員要求的電子郵件設定','EMAIL_CHANGE_REQUIRED');
  if(path==='/school/mail-address'&&req.method==='GET')return send(200,await mailAddress(user));
  if(path==='/school/mail-status'&&req.method==='GET')return send(200,await mailStatus(user));
  if(path==='/school/mail-address'&&req.method==='POST'){const b=await body(req);return send(202,await requestMailVerification(user,b.address));}
  if(path==='/school/mail-verify'&&req.method==='POST'){const b=await body(req);return send(200,await confirmMailVerification(user,b.code));}
+ if(path==='/school/mailboxes'&&req.method==='GET')return send(200,await listMailboxes(user));
+ if(path==='/school/mailboxes'&&req.method==='POST'){const b=await body(req);return send(201,await createMailbox(user,b.address));}
+ const mailboxMatch=path.match(/^\/school\/mailboxes\/([0-9a-f-]{36})$/i);
+ if(mailboxMatch&&req.method==='PATCH'){const b=await body(req);return send(200,await updateMailbox(user,mailboxMatch[1],b.address));}
+ if(mailboxMatch&&req.method==='DELETE')return send(200,await deleteMailbox(user,mailboxMatch[1]));
+ if(path==='/school/mailbox-request'&&req.method==='POST'){const b=await body(req);const box=(await listMailboxes(user)).find(x=>x.id===b.id);if(!box)fail(404,'找不到信箱');return send(202,await requestMailVerification(user,box.address));}
+ if(path==='/school/mailbox-confirm'&&req.method==='POST'){const b=await body(req);return send(200,await confirmMailbox(user,b.code));}
+ const adminMailboxMatch=path.match(/^\/school\/mail-admin\/([0-9a-f-]{36})$/i);
+ if(adminMailboxMatch&&req.method==='GET')return send(200,await listMailboxes(user,adminMailboxMatch[1]));
+ if(path==='/school/mail-tests'&&req.method==='POST')return send(202,await createMailTest(user));
+ if(path==='/school/mail-test-latest'&&req.method==='GET')return send(200,await latestMailTest(user));
+ const mailTestMatch=path.match(/^\/school\/mail-tests\/([0-9a-f-]{36})$/i);
+ if(mailTestMatch&&req.method==='GET')return send(200,await getMailTest(user,mailTestMatch[1]));
  if(path==='/school/broadcasts'&&req.method==='POST'){const b=await body(req);return send(202,await createBroadcast(user,b.message));}
  if(path==='/school/broadcast-latest'&&req.method==='GET')return send(200,await getBroadcast(user,'latest'));
  const broadcastMatch=path.match(/^\/school\/broadcasts\/(latest|[0-9a-f-]{36})$/i);
@@ -145,14 +164,17 @@ const server = createServer(async (req,res) => {
  }
  if (path === "/admin/accounts" && ["GET","POST"].includes(req.method)) {
  if(!["admin","teacher"].includes(user.role)) fail(403,"僅限教師或管理員管理帳號");
- if(req.method==="GET") return send(200,(await db.query(["teacher","assistant"].includes(user.role) ? "select id,email,display_name,role,disabled,must_change_password from accounts704 where role='student' order by display_name" : "select id,email,display_name,role,disabled,must_change_password from accounts704 order by role,display_name")).rows);
+ if(req.method==="GET") return send(200,(await db.query(["teacher","assistant"].includes(user.role) ? "select id,email,display_name,role,disabled,must_change_password,must_add_email,must_change_email from accounts704 where role='student' order by display_name" : "select id,email,display_name,role,disabled,must_change_password,must_add_email,must_change_email from accounts704 order by role,display_name")).rows);
  const value=await body(req);
  const email=typeof value.email==="string"?value.email.trim().toLowerCase():"";
  const name=typeof value.name==="string"&&value.name.trim()?value.name.trim():email;
  if(["teacher","assistant"].includes(user.role) && value.role!=="student") fail(403,"教師只能建立學生帳號");
+ if(value.must_change_email==='default'&&(user.role!=='admin'||value.role!=='student'||!/^[A-Za-z0-9._-]+$/.test(email)))fail(400,'此帳號沒有可自動建立的預設信箱，請先建立帳號後選擇信箱');
  if(!email || !["student","teacher","assistant","admin"].includes(value.role) || typeof value.password!=="string" || (value.disabled!==undefined&&typeof value.disabled!=="boolean") || (value.must_change_password!==undefined&&typeof value.must_change_password!=="boolean")) fail(400,"帳號欄位格式錯誤");
  const result=await db.query("insert into accounts704(id,email,display_name,role,password_hash,disabled,must_change_password) values($1,$2,$3,$4,$5,$6,$7) on conflict(email) do nothing returning id,email,display_name,role,disabled,must_change_password",[randomUUID(),email,name,value.role,await hash(value.password),value.disabled??false,value.must_change_password??false]);
  if(!result.rowCount) fail(409,"此帳號已存在");
+ if(user.role==='admin'&&value.must_add_email===true)await db.query('update accounts704 set must_add_email=true,must_add_email_since=now() where id=$1',[result.rows[0].id]);
+ if(user.role==='admin'&&value.must_change_email==='default')await db.query('update accounts704 set must_change_email=(select id from school_mailboxes where account_id=$1 and locked limit 1),must_change_email_original=(select address from school_mailboxes where account_id=$1 and locked limit 1) where id=$1',[result.rows[0].id]);
  return send(201,result.rows[0]);
  }
  const accountMatch=path.match(/^\/admin\/accounts\/([0-9a-f-]{36})$/i);
@@ -175,10 +197,14 @@ const server = createServer(async (req,res) => {
  const email=value.email===undefined?target.email:typeof value.email==="string"?value.email.trim().toLowerCase():"";
  const name=value.name===undefined?target.display_name:typeof value.name==="string"&&value.name.trim()?value.name.trim():email;
  const role=value.role??target.role,disabled=value.disabled??target.disabled,mustChange=value.must_change_password??target.must_change_password;
+ if(user.role!=='admin'&&(value.must_add_email!==undefined||value.must_change_email!==undefined))fail(403,'僅限管理員設定電子郵件要求');
+ if(user.role==='admin'&&value.must_add_email!==undefined&&typeof value.must_add_email!=='boolean')fail(400,'電子郵件要求格式錯誤');
+ if(user.role==='admin'&&value.must_change_email){const m=await client.query('select id from school_mailboxes where id=$1 and account_id=$2',[value.must_change_email,target.id]);if(!m.rowCount)fail(400,'請選擇此帳號的電子郵件');}
  if(!email || !["student","teacher","assistant","admin"].includes(role) || typeof disabled!=="boolean" || typeof mustChange!=="boolean" || (value.reset_password!==undefined&&typeof value.reset_password!=="boolean") || (value.reset_password&&typeof value.password!=="string")) fail(400,"帳號欄位格式錯誤");
  if(target.id===user.id && (disabled||role!=="admin"&&user.role==="admin")) fail(400,"不能停用自己或移除自己的管理員身分");
  if(target.role==="admin"&&!target.disabled&&(disabled||role!=="admin")&&Number((await client.query("select count(*)::int as total from accounts704 where role='admin' and not disabled")).rows[0].total)<=1) fail(400,"至少需保留一位啟用中的管理員");
  const result=await client.query("update accounts704 set email=$1,display_name=$2,role=$3,disabled=$4,must_change_password=$5,password_hash=$6 where id=$7 returning id,email,display_name,role,disabled,must_change_password",[email,name,role,disabled,mustChange,value.reset_password?await hash(value.password):target.password_hash,target.id]);
+ if(user.role==='admin')await client.query('update accounts704 set must_add_email=$2,must_add_email_since=case when not $2 then null when not must_add_email then now() else must_add_email_since end,must_change_email=$3,must_change_email_original=case when $3::uuid is null then null when must_change_email=$3 then must_change_email_original else (select address from school_mailboxes where id=$3) end where id=$1',[target.id,value.must_add_email??target.must_add_email,value.must_change_email===undefined?target.must_change_email:value.must_change_email]);
  await client.query("delete from sessions704 where account_id=$1",[target.id]);
  await client.query("commit");
  return send(200,{...result.rows[0],reauthenticate:target.id===user.id});

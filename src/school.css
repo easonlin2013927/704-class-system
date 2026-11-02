@@ -33,6 +33,3 @@
 .report-menu summary { cursor: pointer; padding: 8px; }
 .report-menu > div { display: none; position: absolute; z-index: 4; min-width: 150px; padding: 8px; border-radius: 10px; background: var(--surface, #202438); box-shadow: 0 5px 20px #0006; }
 .report-menu[open] > div, .report-menu:hover > div, .report-menu:focus-within > div { display: grid; gap: 4px; }
-.dashboard-wallpaper { min-height: 65vh; padding: clamp(20px, 4vw, 48px); border-radius: 22px; }
-.dashboard-details { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-top:24px; }
-.dashboard-details section { padding:16px; border-radius:14px; background:var(--surface, #202438); }

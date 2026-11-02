@@ -7,6 +7,7 @@
 [data-theme="midnight"] { color-scheme:dark; --page:#0b1327; --surface:#17223d; --control:#202d4c; --ink:#e7edff; --muted:#acbad9; --accent:#615aca; --line:#50658a80; --danger:#ffb0c1; }
 html { color:var(--ink); background:var(--page); --navy:var(--accent); --indigo:var(--accent); }
 body,.login-shell { background:var(--page)!important; color:var(--ink); }
+body.has-wallpaper { background-image:linear-gradient(#0004,#0004),var(--user-wallpaper)!important; background-size:cover!important; background-position:center!important; background-attachment:fixed!important; }
 .topbar,.login-card,.article-paper,.announcement-card,.editor-card,.form-dialog,.create-options { background:var(--surface)!important; color:var(--ink)!important; border-color:var(--line)!important; }
 input,select,textarea,.editor-card textarea,.rich-editor,.format-toolbar,.editor-options,.empty-state,.search-box,.secondary-button { background:var(--control)!important; color:var(--ink)!important; border-color:var(--line)!important; }
 .primary-button { background:var(--accent)!important; color:#fff!important; }
