@@ -16,7 +16,7 @@ export const themes = [
 export function applyTheme(id){document.documentElement.dataset.theme=themes.some(theme=>theme.id===id)?id:'dark';}
 export async function prepareAvatar(file){
  if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('請選擇 PNG、JPEG 或 WebP 圖片');
- if(file.size>5*1024*1024)throw new Error('請選擇 5 MB 以內的圖片');
+ if(file.size>400*1024*1024)throw new Error('請選擇 400 MB 以內的圖片');
  let bitmap;
  try{bitmap=await createImageBitmap(file);}catch{throw new Error('無法讀取圖片，請重新選擇');}
  const canvas=document.createElement('canvas');canvas.width=256;canvas.height=256;

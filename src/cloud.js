@@ -1,4 +1,4 @@
-import { config } from "./config.js?v=0.23.0";
+import { config } from "./config.js?v=0.24.0";
 let token = null;
 async function request(path, options = {}) {
   if (!config.url) throw new Error("系統尚未設定雲端服務，請聯絡管理員。");
@@ -29,20 +29,20 @@ export const cloud = {
   presence(){return request('/school/presence',{method:'POST',silent:true});},
   school(path,method='GET',value){return request('/school/'+path,{method,...(value===undefined?{}:{body:JSON.stringify(value)})});},
   attachments(post){return request('/school/attachments?post='+encodeURIComponent(post));},
-  async uploadAttachment(post,file){if(file.size>200000)throw new Error('單一附件不能超過 200 KB');const entry=await request('/school/attachments',{method:'POST',body:JSON.stringify({announcement_id:post,name:file.name})});try{const bytes=new Uint8Array(await file.arrayBuffer());for(let i=0;i<bytes.length||i===0;i+=100000){const part=bytes.subarray(i,i+100000);let binary='';for(const byte of part)binary+=String.fromCharCode(byte);await request('/school/attachments/'+entry.id,{method:'PATCH',body:JSON.stringify({data:btoa(binary),complete:i+part.length>=bytes.length})});}}catch(e){await request('/school/attachments/'+entry.id,{method:'DELETE'}).catch(()=>{});throw e;}},
-  attachment(id){return request('/school/attachments/'+encodeURIComponent(id));},
+  async uploadAttachment(post,file,onProgress=()=>{}){if(file.size>400*1024*1024)throw new Error('單一公告附件不能超過 400 MB');const entry=await request('/school/attachments',{method:'POST',body:JSON.stringify({announcement_id:post,name:file.name,type:file.type||'application/octet-stream',size:file.size})});try{const chunkSize=4*1024*1024;for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){const part=file.slice(offset,Math.min(file.size,offset+chunkSize)),complete=offset+part.size>=file.size;const response=await fetch(config.url.replace(/\/$/,'')+'/school/attachments/'+entry.id+'?complete='+complete,{method:'PATCH',credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/octet-stream'},body:part});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||'公告附件上傳失敗');onProgress(file.size?Math.min(100,Math.round((offset+part.size)/file.size*100)):100);}}catch(e){await request('/school/attachments/'+entry.id,{method:'DELETE'}).catch(()=>{});throw e;}},
+  downloadAttachment(id){const anchor=document.createElement('a');anchor.href=config.url.replace(/\/$/,'')+'/school/attachments/'+encodeURIComponent(id);anchor.rel='noopener';document.body.append(anchor);anchor.click();anchor.remove();},
   async uploadChatAttachment(messageId,file,onProgress=()=>{}){
     if(!(file instanceof File))throw new Error('請選擇要傳送的檔案');
-    if(file.size>20*1024*1024)throw new Error('單一聊天檔案上限為 20 MB');
+    if(file.size>400*1024*1024)throw new Error('單一聊天檔案上限為 400 MB');
     const entry=await request('/school/chat-attachments',{method:'POST',body:JSON.stringify({message_id:messageId,name:file.name,type:file.type||'application/octet-stream',size:file.size})});
     try{
-      const bytes=new Uint8Array(await file.arrayBuffer());
-      for(let i=0;i<bytes.length||i===0;i+=100000){
-        const part=bytes.subarray(i,i+100000);
-        let binary='';
-        for(let offset=0;offset<part.length;offset+=8192)binary+=String.fromCharCode(...part.subarray(offset,offset+8192));
-        await request('/school/chat-attachments/'+entry.id,{method:'PATCH',silent:true,body:JSON.stringify({data:btoa(binary),complete:i+part.length>=bytes.length})});
-        onProgress(bytes.length?Math.min(100,Math.round((i+part.length)/bytes.length*100)):100);
+      const chunkSize=4*1024*1024;
+      for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){
+        const part=file.slice(offset,Math.min(file.size,offset+chunkSize));
+        const complete=offset+part.size>=file.size;
+        const response=await fetch(config.url.replace(/\/$/,'')+'/school/chat-attachments/'+entry.id+'?complete='+complete,{method:'PATCH',credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/octet-stream'},body:part});
+        const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||'檔案上傳失敗');
+        onProgress(file.size?Math.min(100,Math.round((offset+part.size)/file.size*100)):100);
       }
       return entry;
     }catch(error){
@@ -51,12 +51,13 @@ export const cloud = {
     }
   },
   async downloadChatAttachment(id){
-    const file=await request('/school/chat-attachments/'+encodeURIComponent(id));
-    const binary=atob(file.data);const bytes=new Uint8Array(binary.length);
-    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-    const url=URL.createObjectURL(new Blob([bytes],{type:file.type||'application/octet-stream'}));
-    const anchor=document.createElement('a');anchor.href=url;anchor.download=file.name||'download';document.body.append(anchor);anchor.click();anchor.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),30000);
+    const anchor=document.createElement('a');anchor.href=config.url.replace(/\/$/,'')+'/school/chat-attachments/'+encodeURIComponent(id);anchor.rel='noopener';document.body.append(anchor);anchor.click();anchor.remove();
+  },
+  async uploadProfileFile(kind,file,onProgress=()=>{}){
+    if(!['avatar','wallpaper'].includes(kind)||!(file instanceof File))throw new Error('圖片上傳格式錯誤');
+    if(file.size>400*1024*1024)throw new Error('圖片檔案不能超過 400 MB');
+    const entry=await request('/school/profile-files',{method:'POST',body:JSON.stringify({kind,type:file.type,size:file.size})}),chunkSize=4*1024*1024;
+    for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){const part=file.slice(offset,Math.min(file.size,offset+chunkSize)),complete=offset+part.size>=file.size,response=await fetch(config.url.replace(/\/$/,'')+'/school/profile-files/'+entry.id+'?complete='+complete,{method:'PATCH',credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/octet-stream'},body:part}),result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||'圖片上傳失敗');onProgress(file.size?Math.min(100,Math.round((offset+part.size)/file.size*100)):100);if(complete)return result.url;}
   },
   async login(email, password, portal, remember=false) {
     token = null;

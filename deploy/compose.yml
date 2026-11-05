@@ -6,6 +6,8 @@ services:
     ports:
       - "127.0.0.1:7040:7040"
     env_file: .env
+    volumes:
+      - ${UPLOAD_STORAGE_HOST:-./upload-storage}:/data/chat-files
     networks:
       - database
     healthcheck:

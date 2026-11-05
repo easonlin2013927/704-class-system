@@ -1,5 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import { appendFile, mkdir, rm, stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { db } from './db.mjs';
+
+const CHAT_FILE_LIMIT=400*1024*1024;
+const CHAT_CHUNK_LIMIT=4*1024*1024;
+const chatUploadRoot=resolve(process.env.CHAT_UPLOAD_DIR||'/data/chat-files');
 
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
 const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value);
@@ -36,6 +43,13 @@ export async function migrateEnhancements(){await db.query(`
  create table if not exists school_chat_blocks(blocker_id uuid references accounts704(id) on delete cascade,blocked_id uuid references accounts704(id) on delete cascade,created_at timestamptz not null default now(),primary key(blocker_id,blocked_id),check(blocker_id<>blocked_id));
  alter table school_messages add column if not exists edited_at timestamptz;
  create table if not exists school_message_attachments(id uuid primary key,message_id uuid not null references school_messages(id) on delete cascade,owner_id uuid references accounts704(id) on delete set null,name text not null,mime_type text not null default 'application/octet-stream',declared_size bigint not null,bytes bytea not null default ''::bytea,complete boolean not null default false,created_at timestamptz not null default now());
+ alter table school_message_attachments add column if not exists storage_key text;
+ alter table school_message_attachments add column if not exists uploaded_size bigint not null default 0;
+ alter table school_attachments add column if not exists mime_type text not null default 'application/octet-stream';
+ alter table school_attachments add column if not exists declared_size bigint;
+ alter table school_attachments add column if not exists storage_key text;
+ alter table school_attachments add column if not exists uploaded_size bigint not null default 0;
+ create table if not exists school_profile_files(id uuid primary key,account_id uuid not null references accounts704(id) on delete cascade,kind text not null,mime_type text not null,declared_size bigint not null,storage_key text not null,uploaded_size bigint not null default 0,complete boolean not null default false,created_at timestamptz not null default now(),check(kind in ('avatar','wallpaper')));
  create index if not exists announcement_reads_account on announcement_reads704(account_id,read_at desc);
  create index if not exists homework_submissions_student on school_homework_submissions(student_id,submitted_at desc);
  create or replace function school_notify_announcement_workflow() returns trigger language plpgsql as $$
@@ -50,10 +64,21 @@ export async function migrateEnhancements(){await db.query(`
  end $$;
  drop trigger if exists school_notify_announcement on announcements704;
  create trigger school_notify_announcement after insert or update of workflow_status on announcements704 for each row execute function school_notify_announcement_workflow();
- `);}
+ `);await mkdir(chatUploadRoot,{recursive:true});}
 
 export async function publishScheduledAnnouncements(){
  await db.query("update announcements704 set workflow_status='published' where workflow_status='scheduled' and publish_at<=now() and (expires_at is null or expires_at>now())");
+}
+
+export async function cleanupExpiredChatFiles(){
+ const rows=(await db.query("delete from school_message_attachments where created_at<=now()-interval '3 days' returning storage_key")).rows;
+ await Promise.all(rows.filter(row=>row.storage_key).map(row=>rm(storagePath(row.storage_key),{force:true}).catch(()=>{})));
+ return rows.length;
+}
+
+export async function serveProfileFile(path,res){
+ const match=path.match(/^\/school\/profile-files\/([0-9a-f-]{36})$/i);if(!match)return false;
+ const file=(await db.query('select * from school_profile_files where id=$1 and complete',[match[1]])).rows[0];if(!file)fail(404,'找不到圖片');const target=storagePath(file.storage_key),info=await stat(target).catch(()=>null);if(!info||info.size!==Number(file.declared_size))fail(404,'圖片檔案不完整');res.writeHead(200,{'Content-Type':file.mime_type,'Content-Length':String(info.size),'Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'});createReadStream(target).pipe(res);return true;
 }
 
 export async function permissionsFor(user){
@@ -79,7 +104,10 @@ async function visibleAnnouncement(id,user){
  return row;
 }
 
-export async function enhancementRoutes({path,query,method,user,tokenHash,readBody,send}){
+async function readChunk(req){const chunks=[];let length=0;for await(const chunk of req){length+=chunk.length;if(length>CHAT_CHUNK_LIMIT)fail(413,'檔案區塊過大');chunks.push(chunk);}return Buffer.concat(chunks,length);}
+const storagePath=key=>{if(!uuid(key))fail(500,'附件儲存資訊錯誤');return resolve(chatUploadRoot,key);};
+
+export async function enhancementRoutes({path,query,method,user,tokenHash,readBody,send,req,res}){
  let match;
  if(path==='/school/permissions'&&method==='GET'){send(200,{permissions:await permissionsFor(user),keys:permissionKeys});return true;}
  if((match=path.match(/^\/school\/permissions\/([0-9a-f-]{36})$/i))){
@@ -135,16 +163,33 @@ export async function enhancementRoutes({path,query,method,user,tokenHash,readBo
  if((match=path.match(/^\/school\/chat-blocks\/([0-9a-f-]{36})$/i))&&method==='DELETE'){if(user.role!=='student')fail(403,'此功能僅供學生使用');await db.query('delete from school_chat_blocks where blocker_id=$1 and blocked_id=$2',[user.id,match[1]]);send(200,{ok:true});return true;}
  if((match=path.match(/^\/school\/message-safety\/([0-9a-f-]{36})$/i))&&method==='PATCH'){const body=await readBody(),content=text(body.content,5000);const row=(await db.query("update school_messages set content=$1,edited_at=now() where id=$2 and author_id=$3 and not deleted and created_at>now()-interval '15 minutes' returning id,content,edited_at",[content,match[1],user.id])).rows[0];if(!row)fail(403,'訊息只能在送出後 15 分鐘內編輯');send(200,row);return true;}
  if(path==='/school/chat-attachments'&&method==='POST'){
-  const body=await readBody();if(!uuid(body.message_id)||typeof body.size!=='number'||!Number.isInteger(body.size)||body.size<0||body.size>20*1024*1024)fail(400,'單一聊天檔案上限為 20 MB');
+  const body=await readBody();if(!uuid(body.message_id)||typeof body.size!=='number'||!Number.isInteger(body.size)||body.size<0||body.size>CHAT_FILE_LIMIT)fail(400,'單一聊天檔案上限為 400 MB');
   const message=(await db.query('select m.* from school_messages m join school_members x on x.room_id=m.room_id and x.account_id=$2 where m.id=$1 and m.author_id=$2',[body.message_id,user.id])).rows[0];if(!message)fail(403,'無法替這則訊息上傳檔案');
-  const row=(await db.query('insert into school_message_attachments(id,message_id,owner_id,name,mime_type,declared_size) values($1,$2,$3,$4,$5,$6) returning id',[randomUUID(),message.id,user.id,text(body.name,255),text(body.type||'application/octet-stream',200),body.size])).rows[0];send(201,row);return true;
+  const id=randomUUID();await appendFile(storagePath(id),Buffer.alloc(0),{flag:'wx'});const row=(await db.query("insert into school_message_attachments(id,message_id,owner_id,name,mime_type,declared_size,storage_key) values($1,$2,$3,$4,$5,$6,$7) returning id,created_at,created_at+interval '3 days' as expires_at",[id,message.id,user.id,text(body.name,255),text(body.type||'application/octet-stream',200),body.size,id])).rows[0];send(201,row);return true;
  }
  if((match=path.match(/^\/school\/chat-attachments\/([0-9a-f-]{36})$/i))){
   const file=(await db.query('select f.*,m.room_id from school_message_attachments f join school_messages m on m.id=f.message_id where f.id=$1',[match[1]])).rows[0];if(!file)fail(404,'找不到聊天檔案');
   const member=(await db.query('select 1 from school_members where room_id=$1 and account_id=$2',[file.room_id,user.id])).rowCount;if(!member)fail(403,'無法存取這個聊天檔案');
-  if(method==='GET'){if(!file.complete)fail(404,'檔案尚未完成上傳');send(200,{name:file.name,type:file.mime_type,size:Number(file.declared_size),data:file.bytes.toString('base64')});return true;}
-  if(method==='DELETE'){if(file.owner_id!==user.id&&user.role!=='admin')fail(403,'無法刪除這個檔案');await db.query('delete from school_message_attachments where id=$1',[file.id]);send(200,{ok:true});return true;}
-  if(method==='PATCH'){if(file.owner_id!==user.id)fail(403,'無法上傳這個檔案');const body=await readBody();if(typeof body.data!=='string'||!/^[A-Za-z0-9+/]*={0,2}$/.test(body.data)||typeof body.complete!=='boolean')fail(400,'檔案區塊格式錯誤');const chunk=Buffer.from(body.data,'base64');if(chunk.length>100000)fail(400,'上傳區塊過大');const result=await db.query('update school_message_attachments set bytes=bytes||$1::bytea,complete=$2 where id=$3 and not complete and octet_length(bytes)+$4<=$5 and octet_length(bytes)+$4<=declared_size and (not $2 or octet_length(bytes)+$4=declared_size) returning id',[chunk,body.complete,file.id,chunk.length,20*1024*1024]);if(!result.rowCount)fail(400,'檔案超過限制、大小不符或已完成');send(200,result.rows[0]);return true;}
+  if(method==='GET'){if(file.created_at&&Date.now()-new Date(file.created_at).getTime()>=3*86400000)fail(410,'此聊天檔案已到期並刪除');if(!file.complete)fail(404,'檔案尚未完成上傳');if(!file.storage_key){send(200,{name:file.name,type:file.mime_type,size:Number(file.declared_size),data:file.bytes.toString('base64')});return true;}const target=storagePath(file.storage_key);const info=await stat(target).catch(()=>null);if(!info||info.size!==Number(file.declared_size))fail(404,'附件檔案不完整');res.writeHead(200,{'Content-Type':file.mime_type||'application/octet-stream','Content-Length':String(info.size),'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});createReadStream(target).pipe(res);return true;}
+  if(method==='DELETE'){if(file.owner_id!==user.id&&user.role!=='admin')fail(403,'無法刪除這個檔案');await db.query('delete from school_message_attachments where id=$1',[file.id]);if(file.storage_key)await rm(storagePath(file.storage_key),{force:true});send(200,{ok:true});return true;}
+  if(method==='PATCH'){if(file.owner_id!==user.id)fail(403,'無法上傳這個檔案');if(!file.storage_key)fail(400,'舊版附件無法繼續上傳');const chunk=await readChunk(req),complete=query?.get('complete')==='true';const client=await db.connect();try{await client.query('begin');const current=(await client.query('select * from school_message_attachments where id=$1 for update',[file.id])).rows[0];if(current.complete||Number(current.uploaded_size)+chunk.length>Number(current.declared_size)||(complete&&Number(current.uploaded_size)+chunk.length!==Number(current.declared_size)))fail(400,'檔案超過限制、大小不符或已完成');await appendFile(storagePath(current.storage_key),chunk);const row=(await client.query('update school_message_attachments set uploaded_size=uploaded_size+$2,complete=$3 where id=$1 returning id,uploaded_size,complete',[current.id,chunk.length,complete])).rows[0];await client.query('commit');send(200,row);return true;}catch(error){await client.query('rollback');throw error;}finally{client.release();}}
+ }
+ if(path==='/school/attachments'){
+  if(method==='GET'){const post=query?.get('post');await visibleAnnouncement(post,user);send(200,(await db.query('select id,name,coalesce(declared_size,octet_length(bytes)) as size,mime_type from school_attachments where announcement_id=$1 and complete order by created_at',[post])).rows);return true;}
+  if(method==='POST'){if(!staff(user))fail(403,'沒有上傳公告附件的權限');const body=await readBody();const announcement=await visibleAnnouncement(body.announcement_id,user);if(user.role!=='admin'&&announcement.author_id!==user.id)fail(403,'無法替這則公告上傳附件');if(typeof body.size!=='number'||!Number.isInteger(body.size)||body.size<0||body.size>CHAT_FILE_LIMIT)fail(400,'單一公告附件上限為 400 MB');const id=randomUUID();await appendFile(storagePath(id),Buffer.alloc(0),{flag:'wx'});const row=(await db.query('insert into school_attachments(id,announcement_id,name,owner_id,mime_type,declared_size,storage_key) values($1,$2,$3,$4,$5,$6,$7) returning id',[id,announcement.id,text(body.name,255),user.id,text(body.type||'application/octet-stream',200),body.size,id])).rows[0];send(201,row);return true;}
+ }
+ if((match=path.match(/^\/school\/attachments\/([0-9a-f-]{36})$/i))){
+  const file=(await db.query('select * from school_attachments where id=$1',[match[1]])).rows[0];if(!file)fail(404,'找不到附件');await visibleAnnouncement(file.announcement_id,user);
+  if(method==='GET'){if(!file.complete)fail(404,'附件尚未完成');if(!file.storage_key){send(200,{name:file.name,data:file.bytes.toString('base64')});return true;}const target=storagePath(file.storage_key),info=await stat(target).catch(()=>null);if(!info||info.size!==Number(file.declared_size))fail(404,'附件檔案不完整');res.writeHead(200,{'Content-Type':file.mime_type||'application/octet-stream','Content-Length':String(info.size),'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});createReadStream(target).pipe(res);return true;}
+  if(!staff(user)||file.owner_id!==user.id&&user.role!=='admin')fail(403,'沒有管理此附件的權限');
+  if(method==='DELETE'){await db.query('delete from school_attachments where id=$1',[file.id]);if(file.storage_key)await rm(storagePath(file.storage_key),{force:true});send(200,{ok:true});return true;}
+  if(method==='PATCH'){if(!file.storage_key)fail(400,'舊版附件無法繼續上傳');const chunk=await readChunk(req),complete=query?.get('complete')==='true';const client=await db.connect();try{await client.query('begin');const current=(await client.query('select * from school_attachments where id=$1 for update',[file.id])).rows[0];if(current.complete||Number(current.uploaded_size)+chunk.length>Number(current.declared_size)||(complete&&Number(current.uploaded_size)+chunk.length!==Number(current.declared_size)))fail(400,'附件超過限制、大小不符或已完成');await appendFile(storagePath(current.storage_key),chunk);const row=(await client.query('update school_attachments set uploaded_size=uploaded_size+$2,complete=$3 where id=$1 returning id,uploaded_size,complete',[current.id,chunk.length,complete])).rows[0];await client.query('commit');send(200,row);return true;}catch(error){await client.query('rollback');throw error;}finally{client.release();}}
+ }
+ if(path==='/school/profile-files'&&method==='POST'){
+  const body=await readBody(),allowed=['image/png','image/jpeg','image/webp','image/gif'];if(!['avatar','wallpaper'].includes(body.kind)||!allowed.includes(body.type)||typeof body.size!=='number'||!Number.isInteger(body.size)||body.size<0||body.size>CHAT_FILE_LIMIT)fail(400,'圖片格式錯誤或超過 400 MB');if(body.kind==='avatar'&&body.type==='image/gif')fail(400,'頭像僅支援 PNG、JPEG 或 WebP');const id=randomUUID();await appendFile(storagePath(id),Buffer.alloc(0),{flag:'wx'});await db.query('insert into school_profile_files(id,account_id,kind,mime_type,declared_size,storage_key) values($1,$2,$3,$4,$5,$6)',[id,user.id,body.kind,body.type,body.size,id]);send(201,{id});return true;
+ }
+ if((match=path.match(/^\/school\/profile-files\/([0-9a-f-]{36})$/i))&&method==='PATCH'){
+  const client=await db.connect();try{await client.query('begin');const current=(await client.query('select * from school_profile_files where id=$1 and account_id=$2 for update',[match[1],user.id])).rows[0];if(!current)fail(404,'找不到圖片上傳工作');const chunk=await readChunk(req),complete=query?.get('complete')==='true';if(current.complete||Number(current.uploaded_size)+chunk.length>Number(current.declared_size)||(complete&&Number(current.uploaded_size)+chunk.length!==Number(current.declared_size)))fail(400,'圖片超過限制、大小不符或已完成');await appendFile(storagePath(current.storage_key),chunk);await client.query('update school_profile_files set uploaded_size=uploaded_size+$2,complete=$3 where id=$1',[current.id,chunk.length,complete]);let url='';if(complete){url=`${process.env.PUBLIC_API_URL||'https://704-announcement-api.easonlin2013927.workers.dev'}/school/profile-files/${current.id}`;await client.query(`update accounts704 set ${current.kind==='avatar'?'avatar_url':'wallpaper_url'}=$1 where id=$2`,[url,user.id]);}await client.query('commit');send(200,{id:current.id,complete,url});return true;}catch(error){await client.query('rollback');throw error;}finally{client.release();}
  }
  return false;
 }

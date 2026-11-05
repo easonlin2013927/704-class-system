@@ -16,6 +16,9 @@ cloudflared 直接運行在同一台主機時適用下列步驟。0.3.0 將登�
 - PGPASSWORD：該使用者的密碼。
 - DB_NETWORK：PostgreSQL 所連接的 Docker 網路名稱。
 - ALLOWED_ORIGIN：保持 https://easonlin2013927.github.io，不能加網址路徑或尾斜線。
+- PUBLIC_API_URL：保持 `https://704-announcement-api.easonlin2013927.workers.dev`。
+- UPLOAD_STORAGE_HOST：設定為 1.8 TB 硬碟上的絕對目錄，例如 `/mnt/class-storage/704-uploads`。聊天室檔案、公告附件、頭像與桌布都會存放於此；請先建立目錄並確認 Docker 有讀寫權限。
+- CHAT_UPLOAD_DIR：容器內保持 `/data/chat-files`，不需更改。
 
 不要使用資料庫超級使用者。專用帳號必須能在專用資料庫的 public schema 建表，不能授予其他資料庫管理權限。不要執行舊 supabase/schema.sql。
 
@@ -32,6 +35,8 @@ curl http://127.0.0.1:7040/health
 健康檢查應回傳 {"status":"ok"}。如果失敗，查看 api704 容器日誌；檢查 Docker 網路、PGHOST、密碼及建表權限。分享日誌前遮蔽個資。
 
 啟動只建立不存在的資料表，不會清空公告。只發佈 127.0.0.1:7040，資料庫不開放外網。
+
+所有上傳位置的單一檔案上限為 400 MB。聊天室附件在建立 72 小時後會自動從資料庫紀錄與 `UPLOAD_STORAGE_HOST` 刪除；公告附件、頭像與桌布不會套用三天期限。備份時請同時備份 PostgreSQL 與 `UPLOAD_STORAGE_HOST`。
 
 ## 4. 建立帳號
 

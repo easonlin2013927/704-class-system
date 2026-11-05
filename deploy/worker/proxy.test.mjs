@@ -20,9 +20,10 @@ test('authenticated request keeps authorization and history cursor; query cannot
 });
 test('reject oversized bodies, unknown paths, redirects, HTML challenges, and network failures',async()=>{
  let hits=0;const upstream=async()=>{hits++;return json({});};
- const huge=await proxyRequest(new Request(base+'/login',{method:'POST',body:'x'.repeat(262145)}),{fetchUpstream:upstream});assert.equal(huge.status,413);assert.equal(hits,0);
+ const huge=await proxyRequest(new Request(base+'/login',{method:'POST',body:'x'.repeat(4*1024*1024+1)}),{fetchUpstream:upstream});assert.equal(huge.status,413);assert.equal(hits,0);
  assert.equal((await proxyRequest(new Request(base+'/arbitrary/proxy'))).status,404);
  for(const response of [new Response(null,{status:302,headers:{Location:'https://other.example'}}),new Response('<html>challenge</html>',{status:403,headers:{'Content-Type':'text/html'}})])assert.equal((await proxyRequest(new Request(base+'/health'),{fetchUpstream:async()=>response})).status,502);
  assert.equal((await proxyRequest(new Request(base+'/health'),{fetchUpstream:async()=>{throw Error('network secret');}})).status,502);
 });
 test('API permission failures keep status and JSON message',async()=>{const r=await proxyRequest(new Request(base+'/admin/accounts',{headers:{Origin:origin,Authorization:'Bearer fixture'}}),{fetchUpstream:async()=>json({message:'沒有權限'},403)});assert.equal(r.status,403);assert.equal((await r.json()).message,'沒有權限');});
+test('streams large file downloads without converting them to JSON',async()=>{const id='11111111-1111-4111-8111-111111111111',payload=new Uint8Array([1,2,3,4]);const r=await proxyRequest(new Request(`${base}/school/chat-attachments/${id}`,{headers:{Origin:origin}}),{fetchUpstream:async()=>new Response(payload,{headers:{'Content-Type':'application/octet-stream','Content-Length':'4','Content-Disposition':"attachment; filename*=UTF-8''file.bin"}})});assert.equal(r.status,200);assert.equal(r.headers.get('Content-Length'),'4');assert.equal(r.headers.get('Content-Disposition'),"attachment; filename*=UTF-8''file.bin");assert.deepEqual(new Uint8Array(await r.arrayBuffer()),payload);});

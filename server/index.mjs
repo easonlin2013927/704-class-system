@@ -11,7 +11,7 @@ import {migrateMailboxes,listMailboxes,createMailbox,updateMailbox,deleteMailbox
 import {migrateMailDeliveries,processMultiMail} from './multi-mail-worker.mjs';
 import {createMailTest,getMailTest,latestMailTest} from './mail-tests.mjs';
 import {migrateMailEvents,markPresence,scheduleWeeklyRanking} from './mail-events.mjs';
-import {migrateEnhancements,enhancementRoutes,authorizeEnhancedSchoolRoute,publishScheduledAnnouncements} from './enhancements.mjs';
+import {migrateEnhancements,enhancementRoutes,authorizeEnhancedSchoolRoute,publishScheduledAnnouncements,cleanupExpiredChatFiles,serveProfileFile} from './enhancements.mjs';
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
@@ -20,6 +20,7 @@ const themes=new Set(["dark","light","ocean","forest","rose","amber","midnight",
 function profile(account){return {id:account.id,role:account.role,display_name:account.display_name,must_change_password:account.must_change_password,must_add_email:account.must_add_email,must_change_email:account.must_change_email,nickname:account.nickname,theme:account.theme,avatar_url:account.avatar_url,wallpaper_url:account.wallpaper_url};}
 function validAvatar(value){
  if(value==="")return true;
+ try{const candidate=new URL(value),base=new URL(process.env.PUBLIC_API_URL||'https://704-announcement-api.easonlin2013927.workers.dev');if(candidate.origin===base.origin&&/^\/school\/profile-files\/[0-9a-f-]{36}$/i.test(candidate.pathname))return true;}catch{}
  if(typeof value!=="string"||value.length>220000)return false;
  const match=value.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/);if(!match)return false;
  const bytes=Buffer.from(match[2],"base64");if(bytes.length>160000||bytes.toString("base64")!==match[2])return false;
@@ -56,6 +57,8 @@ const rankingMailTimer=setInterval(scheduleWeeklyRanking,60000);rankingMailTimer
 scheduleWeeklyRanking();
 const scheduledAnnouncementTimer=setInterval(()=>publishScheduledAnnouncements().catch(()=>console.error('Scheduled announcement publishing unavailable')),30000);scheduledAnnouncementTimer.unref();
 publishScheduledAnnouncements().catch(()=>{});
+const expiredChatFileTimer=setInterval(()=>cleanupExpiredChatFiles().catch(()=>console.error('Expired chat file cleanup unavailable')),60*60*1000);expiredChatFileTimer.unref();
+cleanupExpiredChatFiles().catch(()=>{});
 const server = createServer(async (req,res) => {
  const send = (code,data) => { res.writeHead(code,{"Content-Type":"application/json; charset=utf-8"});res.end(JSON.stringify(data)); };
  res.setHeader("Cache-Control","no-store");
@@ -71,6 +74,7 @@ const server = createServer(async (req,res) => {
  if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
  const path = new URL(req.url,"http://localhost").pathname;
  if (path === "/health" && req.method === "GET") { await db.query("select 1"); return send(200,{status:"ok"}); }
+ if(req.method==="GET"&&await serveProfileFile(path,res))return;
  if (path === "/public/banner" && req.method === "GET") {
  const banner=(await db.query("select enabled,content from login_banner704 where id=1")).rows[0];
  const marquee=(await db.query("select enabled,content from site_marquee704 where id=1")).rows[0];
@@ -153,7 +157,7 @@ const server = createServer(async (req,res) => {
  }
  if(path.startsWith('/school/')){
  const query=new URL(req.url,'http://localhost').searchParams;
- if(await enhancementRoutes({path,query,method:req.method,user,tokenHash:digest(token),readBody:()=>body(req),send}))return;
+ if(await enhancementRoutes({path,query,method:req.method,user,tokenHash:digest(token),readBody:()=>body(req),send,req,res}))return;
  await authorizeEnhancedSchoolRoute(user,path,req.method);
  return await schoolRoutes({path,query,method:req.method,user,readBody:()=>body(req),send});
  }
