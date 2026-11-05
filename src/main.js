@@ -1,13 +1,13 @@
-import { cloud } from "./cloud.js?v=0.20.1";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.20.1';
-import {mountMailboxes} from './mailboxes.js?v=0.20.1';
-import {mountMailTest} from './mail-test.js?v=0.20.1';
-import { portals, portalRole } from "./portal.js?v=0.13.0";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.20.1';
+import { cloud } from "./cloud.js?v=0.21.0";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.21.0';
+import {mountMailboxes} from './mailboxes.js?v=0.21.0';
+import {mountMailTest} from './mail-test.js?v=0.21.0';
+import { portals, portalRole } from "./portal.js?v=0.21.0";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.21.0";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.21.0';
 
 let activeRole = portalRole(location.hash);
-function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});}
+function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest?v=0.21.0':'./src/student.webmanifest?v=0.21.0';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js?v=0.21.0',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});}
 setupPwa(activeRole);
 const isPwaWindow=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 let installPrompt=null;
@@ -213,7 +213,7 @@ function renderLogin() {
   document.title = portal.title + "｜704班級系統";
   app.innerHTML = `
     <main class="login-shell">
-      <header class="login-masthead"><span class="portal-emblem">704</span><span>704班級系統</span><a class="repo-button" href="https://github.com/easonlin2013927/704-class-system" target="_blank" rel="noopener noreferrer">GitHub ↗</a><span class="portal-status"><i></i> CAMPUS CONNECTED</span></header>
+      <header class="login-masthead"><span class="portal-emblem">704</span><span>704班級系統</span><a class="repo-button" href="https://github.com/easonlin2013927/704-class-system" target="_blank" rel="noopener noreferrer">GitHub ↗</a><span class="portal-status"><i></i> 班級系統連線中</span></header>
       ${state.marquee.enabled && state.marquee.content ? `<div class="login-marquee site-marquee" role="status"><strong>最新消息</strong><span>${escapeHtml(state.marquee.content)}</span></div>` : ""}
       <div class="login-center">
         <section class="login-slogan rich-content" aria-label="登入標語" ${state.banner.enabled && stripHtml(state.banner.content).trim() ? "" : "hidden"}>${sanitizeHtml(state.banner.content)}</section>
@@ -232,7 +232,7 @@ function renderLogin() {
           ${activeRole!=='admin'?'<p class="helper">請安裝此應用程式：iPad／iPhone 在 Safari 按分享，再選「加入主畫面」；其他裝置可使用瀏覽器的安裝選項。</p>':''}
         </div>
       </section>
-      </div><footer class="login-footnote">704 ANNOUNCEMENT SYSTEM <span>讓每一則消息，清楚抵達。</span></footer>
+      </div><footer class="login-footnote">704 班務手冊 <span>讓每一則消息，清楚抵達。</span></footer>
     </main>`;
 
   document.querySelector("#login-form").addEventListener("submit", async (event) => {
@@ -404,7 +404,7 @@ function renderDashboard() {
     ${headerTemplate()}
     <main id="main-content" class="page-shell" tabindex="-1">
       <section class="hero-row">
-        <div><span class="eyebrow dark">${isTeacher ? "TEACHER CONSOLE" : "STUDENT BULLETIN"}</span><h1>${isTeacher ? "公告管理" : "公告"}</h1><p>${isTeacher ? "清楚傳遞每一項班級資訊。" : "今天也別忘了看看班級的新消息。"}</p></div>
+        <div><h1>${isTeacher ? "公告管理" : "公告"}</h1><p>${isTeacher ? "清楚傳遞每一項班級資訊。" : "今天也別忘了看看班級的新消息。"}</p></div>
         ${isTeacher ? `<div class="create-menu"><button class="primary-button" id="create-toggle" aria-expanded="false" aria-controls="create-options">${icon("plus",18)} 新增</button><div id="create-options" class="create-options" hidden><button id="new-post">公告</button><button id="new-activity">活動</button><button data-school-create="homework">作業</button>${['teacher','admin'].includes(state.session.role)?'<button data-school-create="missing">缺交項目</button><button data-school-create="feedback">個別評語／提醒</button>':''}</div></div>` : ""}
       </section>
       <div id="student-home-overview"></div>

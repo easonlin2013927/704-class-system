@@ -1,0 +1,31 @@
+/* Responsive rules for the 704 class notebook interface. */
+@media (max-width:1120px){
+  .topbar{padding-inline:16px}.repo-button{display:none}.user-block strong{max-width:110px}
+  .page-shell,.article-shell,.editor-shell{width:min(var(--content),calc(100% - 40px))}.studio-workspace{grid-template-columns:minmax(0,1fr) 260px}
+}
+@media (max-width:920px){
+  :root{--topbar:64px}#app:has(>.topbar),#app:has(>.topbar):has(>.site-marquee){display:block;min-height:100dvh}
+  .topbar{position:sticky;height:var(--topbar)!important;padding-inline:12px}.wordmark{min-width:0;margin-right:auto}.wordmark strong{font-size:15px}.wordmark small{display:none}.wordmark .brand-mark.small{width:38px;height:38px}
+  .top-actions{margin-left:0}.user-block>div:last-child,.role-chip{display:none}.top-actions>.secondary-button{padding-inline:10px}.site-marquee{position:relative;padding-inline:16px}
+  .school-nav{position:sticky;top:var(--topbar);z-index:22;width:100%;height:auto;display:flex;flex-direction:row;gap:0;overflow-x:auto;padding:0 12px;background:var(--surface)!important;border:0!important;border-bottom:1px solid var(--line-strong)!important}
+  .school-nav::before{display:none}.school-nav button{flex:0 0 auto;width:auto;min-height:48px;padding:9px 14px;border-bottom:3px solid transparent!important;white-space:nowrap}.school-nav button[aria-current="page"]{border-bottom-color:var(--red)!important}.school-nav button[aria-current="page"]::before{display:none}
+  #app:has(>.topbar)>main{min-width:0}.settings-tabs{top:calc(var(--topbar) + 58px)}.studio-workspace{display:block}.studio-panel{margin-top:16px}.chat-layout{grid-template-columns:230px minmax(0,1fr)}
+}
+@media (max-width:720px){
+  body{font-size:15px}.page-shell,.article-shell,.editor-shell{width:calc(100% - 28px)}.page-shell,.school-shell,.editor-shell,.article-shell{padding-top:22px;padding-bottom:54px}
+  .hero-row,.school-heading{align-items:flex-start;flex-direction:column;gap:14px;margin-bottom:18px;padding-bottom:14px}.hero-row h1,.school-heading h1,.editor-heading h1{font-size:29px}.section-heading{align-items:flex-end}
+  .toolbar{align-items:stretch;flex-direction:column}.search-box{width:100%;min-width:0}.filter-tabs{width:100%;overflow-x:auto}.filter-tab{flex:0 0 auto}
+  .announcement-card{padding:17px 10px 16px 18px}.announcement-card h3{font-size:18px}.student-overview{padding:16px}.overview-links{display:grid;grid-template-columns:1fr 1fr}.overview-links .secondary-button{width:100%}
+  .form-grid,.two-column,.three-column{grid-template-columns:1fr!important}.account-row{grid-template-columns:minmax(0,1fr) auto}.account-row>*:nth-child(2){grid-column:1/-1}.school-filters{align-items:stretch;flex-direction:column}
+  .article-paper{padding:24px 18px}.article-paper h1{font-size:30px}.rich-content{font-size:15px}.comments-panel{width:calc(100% - 28px)}
+  .chat-layout{height:calc(100dvh - 178px);min-height:480px;display:block;position:relative}.room-list{position:absolute;inset:0 auto 0 0;z-index:5;width:min(86vw,300px);transform:translateX(-105%);transition:transform 160ms ease;border-right:1px solid var(--ink)}.chat-layout.rooms-open .room-list{transform:none}.chat-main{height:100%}.chat-bubble{max-width:88%}
+  .login-center{grid-template-columns:1fr;gap:30px;padding-block:40px}.login-slogan{font-size:clamp(28px,9vw,42px)}.login-card{box-shadow:5px 5px 0 var(--line-strong)!important}
+  .form-dialog,.school-dialog{width:calc(100% - 18px);max-height:92dvh;box-shadow:4px 4px 0 color-mix(in srgb,var(--ink) 24%,transparent)!important}.theme-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:500px){
+  .topbar{gap:4px;padding-inline:8px}.wordmark{gap:7px;padding-inline:0}.wordmark .brand-mark.small{width:35px;height:35px}.wordmark strong{max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.top-actions{gap:1px}.top-actions>.secondary-button,.top-actions>.primary-button{min-width:42px;padding-inline:8px;font-size:0}.icon-button{width:42px;min-width:42px;height:42px}
+  .school-nav{padding-inline:5px}.school-nav button{padding-inline:12px}.site-marquee{padding-inline:10px}.site-marquee strong{display:none}.page-shell,.article-shell,.editor-shell{width:calc(100% - 20px)}
+  .hero-row h1,.school-heading h1,.editor-heading h1{font-size:26px}.primary-button,.secondary-button,.danger-button{padding-inline:12px}.overview-links{grid-template-columns:1fr}.theme-grid{grid-template-columns:1fr}.settings-tabs{width:100%}.settings-tabs button{padding-inline:12px}
+  .login-masthead{padding-inline:14px}.login-masthead .repo-button{display:none}.login-center{padding-inline:14px}.login-slogan::before{margin-bottom:12px}.login-footnote span{display:none}.article-paper{padding-inline:15px}.announcement-card footer{align-items:flex-start;flex-direction:column;gap:10px}.card-actions{align-self:flex-end}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition-duration:.01ms!important;transition-delay:0ms!important}}
