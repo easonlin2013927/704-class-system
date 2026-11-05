@@ -11,11 +11,12 @@ import {migrateMailboxes,listMailboxes,createMailbox,updateMailbox,deleteMailbox
 import {migrateMailDeliveries,processMultiMail} from './multi-mail-worker.mjs';
 import {createMailTest,getMailTest,latestMailTest} from './mail-tests.mjs';
 import {migrateMailEvents,markPresence,scheduleWeeklyRanking} from './mail-events.mjs';
+import {migrateEnhancements,enhancementRoutes,authorizeEnhancedSchoolRoute,publishScheduledAnnouncements} from './enhancements.mjs';
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
 const categories = new Set(["important","academic","activity","general"]);
-const themes=new Set(["dark","light","ocean","forest","rose","amber","midnight"]);
+const themes=new Set(["dark","light","ocean","forest","rose","amber","midnight","slate","notebook","lavender","brick","teal","mono"]);
 function profile(account){return {id:account.id,role:account.role,display_name:account.display_name,must_change_password:account.must_change_password,must_add_email:account.must_add_email,must_change_email:account.must_change_email,nickname:account.nickname,theme:account.theme,avatar_url:account.avatar_url,wallpaper_url:account.wallpaper_url};}
 function validAvatar(value){
  if(value==="")return true;
@@ -36,6 +37,7 @@ async function body(req) {
 function fail(status, message, code) { throw Object.assign(new Error(message),{status,code}); }
 await migrate();
 await migrateSchool();
+await migrateEnhancements();
 await migrateBroadcast();
 await migrateMail();
 await migrateMailboxes();
@@ -52,6 +54,8 @@ const broadcastTimer=setInterval(processBroadcasts,3000);broadcastTimer.unref();
 const mailTimer=setInterval(processMultiMail,15000);mailTimer.unref();
 const rankingMailTimer=setInterval(scheduleWeeklyRanking,60000);rankingMailTimer.unref();
 scheduleWeeklyRanking();
+const scheduledAnnouncementTimer=setInterval(()=>publishScheduledAnnouncements().catch(()=>console.error('Scheduled announcement publishing unavailable')),30000);scheduledAnnouncementTimer.unref();
+publishScheduledAnnouncements().catch(()=>{});
 const server = createServer(async (req,res) => {
  const send = (code,data) => { res.writeHead(code,{"Content-Type":"application/json; charset=utf-8"});res.end(JSON.stringify(data)); };
  res.setHeader("Cache-Control","no-store");
@@ -88,12 +92,13 @@ const server = createServer(async (req,res) => {
  if (!["teacher","student","admin"].includes(data.portal) || data.portal !== (account.role==="assistant"?"teacher":account.role)) fail(403,"帳號不屬於此登入入口");
  const token = randomBytes(32).toString("hex");
  if(data.remember!==undefined&&typeof data.remember!=='boolean')fail(400,"登入設定格式錯誤");
- await db.query("insert into sessions704 values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end)",[digest(token),account.id,data.remember===true]);
+ await db.query("insert into sessions704(token_hash,account_id,expires_at,user_agent) values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end,$4)",[digest(token),account.id,data.remember===true,String(req.headers['user-agent']||'').slice(0,500)]);
  return send(200,{token,remembered:data.remember===true,profile:profile(account)});
  }
  const token = req.headers.authorization?.replace(/^Bearer /,"") || "";
  const user = (await db.query("select a.id,a.role,a.display_name,a.must_change_password,a.must_add_email,a.must_change_email from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now() and not a.disabled",[digest(token)])).rows[0];
  if (!user) fail(401,"登入已失效，請重新登入");
+ await db.query('update sessions704 set last_seen=now(),user_agent=case when user_agent=\'\' then $2 else user_agent end where token_hash=$1',[digest(token),String(req.headers['user-agent']||'').slice(0,500)]);
  if (path === "/logout" && req.method === "POST") { await db.query("delete from sessions704 where token_hash=$1",[digest(token)]); return send(200,{ok:true}); }
  if(path === "/account/password" && req.method === "POST"){
  const value=await body(req);
@@ -110,7 +115,7 @@ const server = createServer(async (req,res) => {
  await client.query("update accounts704 set password_hash=$1,must_change_password=false where id=$2",[await hash(value.new_password),user.id]);
  await client.query("delete from sessions704 where account_id=$1",[user.id]);
  const nextToken=randomBytes(32).toString("hex");
- await client.query("insert into sessions704 values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end)",[digest(nextToken),user.id,currentSession.remembered]);
+ await client.query("insert into sessions704(token_hash,account_id,expires_at,user_agent) values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end,$4)",[digest(nextToken),user.id,currentSession.remembered,String(req.headers['user-agent']||'').slice(0,500)]);
  await client.query("commit");
  return send(200,{token:nextToken,remembered:currentSession.remembered,profile:profile({...account,must_change_password:false})});
  }catch(error){await client.query("rollback");throw error;}finally{client.release();}
@@ -146,7 +151,12 @@ const server = createServer(async (req,res) => {
  if(typeof image!=="string"||image.length>210000||!(image===''||/^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/.test(image)))fail(400,"桌布格式錯誤或檔案過大");
  return send(200,profile((await db.query("update accounts704 set wallpaper_url=$1 where id=$2 returning *",[image,user.id])).rows[0]));
  }
- if(path.startsWith('/school/'))return await schoolRoutes({path,query:new URL(req.url,'http://localhost').searchParams,method:req.method,user,readBody:()=>body(req),send});
+ if(path.startsWith('/school/')){
+ const query=new URL(req.url,'http://localhost').searchParams;
+ if(await enhancementRoutes({path,query,method:req.method,user,tokenHash:digest(token),readBody:()=>body(req),send}))return;
+ await authorizeEnhancedSchoolRoute(user,path,req.method);
+ return await schoolRoutes({path,query,method:req.method,user,readBody:()=>body(req),send});
+ }
  if(path==="/me"&&req.method==="PATCH"){
  const value=await body(req);
  if(typeof value.nickname!=="string"||value.nickname.length>80||!themes.has(value.theme)||!validAvatar(value.avatar_url))fail(400,"個人化資料格式錯誤；頭像請使用 PNG、JPEG 或 WebP，且壓縮後不超過 160 KB");
@@ -258,19 +268,22 @@ const server = createServer(async (req,res) => {
  }
  if(path==="/announcements"&&req.method==="GET"){
  const query="select n.*,coalesce(a.display_name,n.author) as author,a.nickname as author_nickname,a.avatar_url as author_avatar from announcements704 n left join accounts704 a on a.id=n.author_id";
- return send(200,(await db.query(query+(user.role==="student"?" where n.audience in ('學生','全部人員','全校學生','七年級','八年級','九年級')":"")+" order by n.pinned desc,n.date desc")).rows);
+ return send(200,(await db.query(query+(user.role==="student"?" where n.audience in ('學生','全部人員','全校學生','七年級','八年級','九年級') and n.workflow_status='published' and coalesce(n.publish_at,n.date)<=now() and (n.expires_at is null or n.expires_at>now())":"")+" order by n.pinned desc,n.date desc")).rows);
  }
  if(!["teacher","assistant","admin"].includes(user.role))fail(403,"僅限教師或管理員管理公告");
  const match=path.match(/^\/announcements\/([0-9a-f-]{36})$/i);
  if((path==="/announcements"&&req.method==="POST")||(match&&req.method==="PATCH")){
  const b=await body(req);
  if(typeof b.title!=="string"||!b.title.trim()||b.title.trim().length>80||!categories.has(b.category)||typeof b.content!=="string"||!b.content.trim()||!["學生","教師","全部人員"].includes(b.audience)||typeof b.pinned!=="boolean"||(b.comments_enabled!==undefined&&typeof b.comments_enabled!=="boolean"))fail(400,"公告欄位不完整或格式錯誤");
+ const requestedWorkflow=b.workflow_status??'published';if(!['draft','published','scheduled'].includes(requestedWorkflow))fail(400,'發布狀態錯誤');
+ const requestedPublish=requestedWorkflow==='scheduled'?new Date(b.publish_at):requestedWorkflow==='published'?new Date():null;if(requestedWorkflow==='scheduled'&&!Number.isFinite(requestedPublish.getTime()))fail(400,'請設定正確的排程發布時間');
+ const requestedExpiry=b.expires_at?new Date(b.expires_at):null;if(requestedExpiry&&!Number.isFinite(requestedExpiry.getTime()))fail(400,'請設定正確的下架時間');
  if(match){
  const client=await db.connect();try{await client.query("begin");const current=await visibleAnnouncement(client,match[1],user," for update");const enabled=b.comments_enabled??current.comments_enabled;
  if(enabled!==current.comments_enabled&&user.role!=="admin"&&current.author_id!==user.id)fail(403,"只有公告張貼者或管理員可以切換評論區");
- const result=await client.query("update announcements704 set title=$1,category=$2,audience=$3,pinned=$4,content=$5,comments_enabled=$6 where id=$7 returning *",[b.title.trim(),b.category,b.audience,b.pinned,b.content,enabled,current.id]);await client.query("commit");return send(200,result.rows[0]);}catch(error){await client.query("rollback");throw error;}finally{client.release();}
+ const result=await client.query("update announcements704 set title=$1,category=$2,audience=$3,pinned=$4,content=$5,comments_enabled=$6,workflow_status=$7,publish_at=$8,expires_at=$9 where id=$10 returning *",[b.title.trim(),b.category,b.audience,b.pinned,b.content,enabled,requestedWorkflow,requestedPublish?.toISOString()||null,requestedExpiry?.toISOString()||null,current.id]);await client.query("commit");return send(200,result.rows[0]);}catch(error){await client.query("rollback");throw error;}finally{client.release();}
  }
- return send(200,(await db.query("insert into announcements704(id,title,category,author,author_id,audience,pinned,content,comments_enabled) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *",[randomUUID(),b.title.trim(),b.category,user.display_name,user.id,b.audience,b.pinned,b.content,b.comments_enabled??false])).rows[0]);
+ return send(200,(await db.query("insert into announcements704(id,title,category,author,author_id,audience,pinned,content,comments_enabled,workflow_status,publish_at,expires_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *",[randomUUID(),b.title.trim(),b.category,user.display_name,user.id,b.audience,b.pinned,b.content,b.comments_enabled??false,requestedWorkflow,requestedPublish?.toISOString()||null,requestedExpiry?.toISOString()||null])).rows[0]);
  }
  if(match&&req.method==="DELETE"){
  const result=await db.query("delete from announcements704 where id=$1 returning id",[match[1]]);if(!result.rowCount)fail(404,"找不到公告");return send(200,{ok:true});

@@ -1,4 +1,4 @@
-import { config } from "./config.js?v=0.21.0";
+import { config } from "./config.js?v=0.23.0";
 let token = null;
 async function request(path, options = {}) {
   if (!config.url) throw new Error("系統尚未設定雲端服務，請聯絡管理員。");
@@ -31,6 +31,33 @@ export const cloud = {
   attachments(post){return request('/school/attachments?post='+encodeURIComponent(post));},
   async uploadAttachment(post,file){if(file.size>200000)throw new Error('單一附件不能超過 200 KB');const entry=await request('/school/attachments',{method:'POST',body:JSON.stringify({announcement_id:post,name:file.name})});try{const bytes=new Uint8Array(await file.arrayBuffer());for(let i=0;i<bytes.length||i===0;i+=100000){const part=bytes.subarray(i,i+100000);let binary='';for(const byte of part)binary+=String.fromCharCode(byte);await request('/school/attachments/'+entry.id,{method:'PATCH',body:JSON.stringify({data:btoa(binary),complete:i+part.length>=bytes.length})});}}catch(e){await request('/school/attachments/'+entry.id,{method:'DELETE'}).catch(()=>{});throw e;}},
   attachment(id){return request('/school/attachments/'+encodeURIComponent(id));},
+  async uploadChatAttachment(messageId,file,onProgress=()=>{}){
+    if(!(file instanceof File))throw new Error('請選擇要傳送的檔案');
+    if(file.size>20*1024*1024)throw new Error('單一聊天檔案上限為 20 MB');
+    const entry=await request('/school/chat-attachments',{method:'POST',body:JSON.stringify({message_id:messageId,name:file.name,type:file.type||'application/octet-stream',size:file.size})});
+    try{
+      const bytes=new Uint8Array(await file.arrayBuffer());
+      for(let i=0;i<bytes.length||i===0;i+=100000){
+        const part=bytes.subarray(i,i+100000);
+        let binary='';
+        for(let offset=0;offset<part.length;offset+=8192)binary+=String.fromCharCode(...part.subarray(offset,offset+8192));
+        await request('/school/chat-attachments/'+entry.id,{method:'PATCH',silent:true,body:JSON.stringify({data:btoa(binary),complete:i+part.length>=bytes.length})});
+        onProgress(bytes.length?Math.min(100,Math.round((i+part.length)/bytes.length*100)):100);
+      }
+      return entry;
+    }catch(error){
+      await request('/school/chat-attachments/'+entry.id,{method:'DELETE',silent:true}).catch(()=>{});
+      throw error;
+    }
+  },
+  async downloadChatAttachment(id){
+    const file=await request('/school/chat-attachments/'+encodeURIComponent(id));
+    const binary=atob(file.data);const bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([bytes],{type:file.type||'application/octet-stream'}));
+    const anchor=document.createElement('a');anchor.href=url;anchor.download=file.name||'download';document.body.append(anchor);anchor.click();anchor.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+  },
   async login(email, password, portal, remember=false) {
     token = null;
     const result = await request("/login", { method: "POST", body: JSON.stringify({ email, password, portal, remember }) });
