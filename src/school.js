@@ -1,4 +1,4 @@
-import { cloud } from './cloud.js?v=0.19.8';
+import { cloud } from './cloud.js?v=0.20.0';
 let poll=null;
 export function disposeSchool(){if(poll)clearInterval(poll);poll=null;}
 const esc=(s='')=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,7 +12,7 @@ const api=(path,method,value)=>cloud.school(path,method,value);
 const button=(label,attrs='',type='button')=>`<button type="${type}" class="secondary-button" ${attrs}>${label}</button>`;
 const empty=label=>`<p class="school-empty">${label}</p>`;
 const heading=(title,desc,action='')=>`<div class="school-heading"><div><h1>${title}</h1><p class="muted">${desc}</p></div>${action}</div>`;
-const dialog=(id,title,content)=>`<dialog id="${id}" class="form-dialog school-dialog"><header><h2>${title}</h2>${button('關閉','data-close')}</header>${content}</dialog>`;
+const dialog=(id,title,content)=>`<dialog id="${id}" class="form-dialog school-dialog" aria-labelledby="${id}-title"><header><h2 id="${id}-title">${title}</h2>${button('關閉','data-close aria-label="關閉'+esc(title)+'"')}</header>${content}</dialog>`;
 const picker=(students,id='recipient-picker')=>`<fieldset class="student-picker" id="${id}"><legend>選擇學生</legend>${students.map(s=>`<label><input type="checkbox" name="students" value="${s.id}">${esc(name(s))}</label>`).join('')||empty('目前沒有已啟用的學生帳號')}</fieldset>`;
 export function schoolNav(user,current='home'){
  const links=[['home','公告'],['homework','作業簿'],['points','班級排行榜'],...((user.role==='student'||teacher(user))?[['grades','成績簿'],['records',user.role==='student'?'我的提醒':'學生紀錄']]:[]),...(teacher(user)?[['reports','檢舉處理']]:[]),...(user.role==='student'?[['chat','聊天'],['report-center','檢舉中心']]:[]),...(user.role==='admin'?[['subjects','科目管理'],['moderation','聊天管理'],['adminchat','聊天紀錄']]:[])];

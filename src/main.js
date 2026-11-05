@@ -1,10 +1,10 @@
-import { cloud } from "./cloud.js?v=0.19.8";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.19.8';
-import {mountMailboxes} from './mailboxes.js?v=0.19.8';
-import {mountMailTest} from './mail-test.js?v=0.19.8';
+import { cloud } from "./cloud.js?v=0.20.0";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.20.0';
+import {mountMailboxes} from './mailboxes.js?v=0.20.0';
+import {mountMailTest} from './mail-test.js?v=0.20.0';
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.19.8';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.20.0';
 
 let activeRole = portalRole(location.hash);
 function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
@@ -214,13 +214,13 @@ function renderLogin() {
   app.innerHTML = `
     <main class="login-shell">
       <header class="login-masthead"><span class="portal-emblem">704</span><span>704班級系統</span><a class="repo-button" href="https://github.com/easonlin2013927/704-class-system" target="_blank" rel="noopener noreferrer">GitHub ↗</a><span class="portal-status"><i></i> CAMPUS CONNECTED</span></header>
-      ${state.marquee.enabled && state.marquee.content ? `<div class="login-marquee site-marquee" role="status"><strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee></div>` : ""}
+      ${state.marquee.enabled && state.marquee.content ? `<div class="login-marquee site-marquee" role="status"><strong>最新消息</strong><span>${escapeHtml(state.marquee.content)}</span></div>` : ""}
       <div class="login-center">
         <section class="login-slogan rich-content" aria-label="登入標語" ${state.banner.enabled && stripHtml(state.banner.content).trim() ? "" : "hidden"}>${sanitizeHtml(state.banner.content)}</section>
       <section class="login-panel">
         <div class="login-card">
           <div class="portal-pill"><span></span>${portal.eyebrow}</div>
-          <h2>${portal.title}</h2>
+          <h1>${portal.title}</h1>
           <p class="muted">${portal.description}</p>
           <form id="login-form">
             <label>帳號<input name="account" autocomplete="username" placeholder="請輸入帳號" type="text" required></label>
@@ -258,7 +258,7 @@ function renderLogin() {
 function headerTemplate() {
   const isTeacher = ["teacher","assistant"].includes(state.session.role);
   return `
-    <header class="topbar">
+    <a class="skip-link" href="#main-content">跳至主要內容</a><header class="topbar">
       <button class="wordmark" data-home aria-label="回到公告首頁"><img class="brand-mark small" src="./src/logo.svg" alt="" /><span><strong>704班級系統</strong><small>班級公告</small></span></button><button class="icon-button" data-school-view="notifications" style="margin-right:auto" aria-label="收件閘" title="收件閘"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg></button>
       <nav class="top-actions">
         <a class="secondary-button repo-button" href="https://github.com/easonlin2013927/704-class-system" target="_blank" rel="noopener noreferrer" aria-label="開啟 GitHub repo">GitHub ↗</a>
@@ -267,14 +267,14 @@ function headerTemplate() {
         <div class="user-block">${avatarMarkup(state.session.name,state.session.avatar_url)}<span><strong title="${escapeHtml(identityName(state.session.name,state.session.nickname))}">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>${state.session.role === "admin" ? "系統管理" : isTeacher ? "公告管理" : "704"}</small></span></div>
 ${["admin","teacher"].includes(state.session.role) ? `<button class="secondary-button" id="open-accounts">${["teacher","assistant"].includes(state.session.role)?"學生帳號":"帳號管理"}</button>` : ""}
 <button class="secondary-button" id="open-settings">設定</button>
-        <button class="icon-button" id="logout" title="登出">${icon("logout")}</button>
+        <button class="icon-button" id="logout" title="登出" aria-label="登出">${icon("logout")}</button>
       </nav>
-    </header>${state.marquee.enabled && state.marquee.content ? `<div class="site-marquee" role="status"><strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee></div>` : ""}${schoolNav(state.session,state.schoolView)}`;
+    </header>${state.marquee.enabled && state.marquee.content ? `<div class="site-marquee" role="status"><strong>最新消息</strong><span>${escapeHtml(state.marquee.content)}</span></div>` : ""}${schoolNav(state.session,state.schoolView)}`;
 }
 
 function renderMaintenance() {
   document.title = "系統維護｜704班級系統";
-  app.innerHTML = `${headerTemplate()}<main class="page-shell">
+  app.innerHTML = `${headerTemplate()}<main id="main-content" class="page-shell" tabindex="-1">
     <section class="hero-row"><div><span class="eyebrow dark">MAINTENANCE CONSOLE</span>
     <h1>系統維護</h1><p>此入口用於查看服務狀態；公告內容由教師端管理。</p></div></section>
     <section class="article-paper"><h2>服務狀態</h2><p id="maintenance-status" aria-live="polite">正在檢查…</p>
@@ -297,7 +297,7 @@ function renderMaintenance() {
 
 function renderAccounts() {
  const isAdmin=state.session.role==="admin";
- app.innerHTML=`${headerTemplate()}<main class="editor-shell">
+ app.innerHTML=`${headerTemplate()}<main id="main-content" class="editor-shell" tabindex="-1">
  <button class="back-button" id="accounts-back">${icon("back",18)} 返回首頁</button>
  <div class="editor-heading"><span class="eyebrow dark">ACCOUNT ADMINISTRATION</span><h1>${isAdmin?"帳號管理":"學生帳號"}</h1><p>${isAdmin?"管理所有角色的人員帳號。":"建立及編輯學生帳號。"}點「編輯」可修改帳號資料、登入選項或重設密碼。</p></div>
  <button class="primary-button" id="create-person">${isAdmin?"建立人員":"建立學生"}</button>
@@ -362,7 +362,7 @@ function renderAccounts() {
 }
 
 function navigateSchool(view,create=null){state.schoolView=view;state.schoolCreate=create;state.selectedId=null;state.editingId=null;state.settingsOpen=false;state.adminView='dashboard';render();}
-function renderSchool(){app.innerHTML=`${headerTemplate()}<main class="page-shell school-shell"><div id="school-page"></div></main>`;bindHeader();mountSchool({node:document.querySelector('#school-page'),user:state.session,view:state.schoolView,create:state.schoolCreate,notify:toast,navigate:navigateSchool});state.schoolCreate=null;}
+function renderSchool(){app.innerHTML=`${headerTemplate()}<main id="main-content" class="page-shell school-shell" tabindex="-1"><div id="school-page"></div></main>`;bindHeader();mountSchool({node:document.querySelector('#school-page'),user:state.session,view:state.schoolView,create:state.schoolCreate,notify:toast,navigate:navigateSchool});state.schoolCreate=null;}
 function goHome(){navigateSchool('home');}
 function bindHeader() {
   document.querySelectorAll('[data-school-view]').forEach(b=>b.addEventListener('click',()=>navigateSchool(b.dataset.schoolView)));
@@ -402,7 +402,7 @@ function renderDashboard() {
   const results = filteredAnnouncements();
   app.innerHTML = `
     ${headerTemplate()}
-    <main class="page-shell">
+    <main id="main-content" class="page-shell" tabindex="-1">
       <section class="hero-row">
         <div><span class="eyebrow dark">${isTeacher ? "TEACHER CONSOLE" : "STUDENT BULLETIN"}</span><h1>${isTeacher ? "公告管理" : "公告"}</h1><p>${isTeacher ? "清楚傳遞每一項班級資訊。" : "今天也別忘了看看班級的新消息。"}</p></div>
         ${isTeacher ? `<div class="create-menu"><button class="primary-button" id="create-toggle" aria-expanded="false" aria-controls="create-options">${icon("plus",18)} 新增</button><div id="create-options" class="create-options" hidden><button id="new-post">公告</button><button id="new-activity">活動</button><button data-school-create="homework">作業</button>${['teacher','admin'].includes(state.session.role)?'<button data-school-create="missing">缺交項目</button><button data-school-create="feedback">個別評語／提醒</button>':''}</div></div>` : ""}
@@ -444,9 +444,13 @@ function renderDashboard() {
   document.querySelectorAll("[data-category]").forEach((button) => button.addEventListener("click", () => {
     state.category = button.dataset.category; renderDashboard();
   }));
-  document.querySelectorAll("[data-open]").forEach((button) => button.addEventListener("click", () => {
-    state.selectedId = button.dataset.open; render();
-  }));
+  document.querySelectorAll("[data-open]").forEach((button) => {
+    const open = () => { state.selectedId = button.dataset.open; render(); };
+    button.addEventListener("click", open);
+    button.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); }
+    });
+  });
   document.querySelectorAll("[data-edit]").forEach((button) => button.addEventListener("click", (event) => {
     event.stopPropagation(); state.editingId = button.dataset.edit; render();
   }));
@@ -462,7 +466,7 @@ function announcementCard(item, isTeacher) {
     <div class="card-meta"><span class="category-tag ${category.tone}">${item.pinned ? icon("pin", 13) : ""}${category.label}</span><time>${formatDate(item.date)}</time></div>
     <h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(excerpt)}${stripHtml(item.content).length > 112 ? "…" : ""}</p>
     <footer><div class="author">${avatarMarkup(item.author,item.author_avatar,"mini")}<span><strong>${escapeHtml(identityName(item.author,item.author_nickname))}</strong><small>${escapeHtml(item.audience)}</small></span></div>
-    ${isTeacher ? `<div class="card-actions"><button data-edit="${item.id}" title="編輯">${icon("edit", 17)}</button><button class="danger" data-delete="${item.id}" title="刪除">${icon("trash", 17)}</button></div>` : `<span class="read-more">閱讀全文 ${icon("arrow", 16)}</span>`}</footer>
+    ${isTeacher ? `<div class="card-actions"><button data-edit="${item.id}" title="編輯" aria-label="編輯公告：${escapeHtml(item.title)}">${icon("edit", 17)}</button><button class="danger" data-delete="${item.id}" title="刪除" aria-label="刪除公告：${escapeHtml(item.title)}">${icon("trash", 17)}</button></div>` : `<span class="read-more">閱讀全文 ${icon("arrow", 16)}</span>`}</footer>
   </article>`;
 }
 
@@ -471,7 +475,7 @@ function renderDetail() {
   if (!item) { state.selectedId = null; return render(); }
   const category = categories[item.category];
   const isTeacher = ["teacher","assistant","admin"].includes(state.session.role);
-  app.innerHTML = `${headerTemplate()}<main class="article-shell">
+  app.innerHTML = `${headerTemplate()}<main id="main-content" class="article-shell" tabindex="-1">
     <button class="back-button" id="back">${icon("back", 18)} 返回公告列表</button>
     <article class="article-paper">
       <header><div class="article-tags"><span class="category-tag ${category.tone}">${item.pinned ? icon("pin", 13) : ""}${category.label}</span><span class="audience-tag">${icon("users", 14)} ${escapeHtml(item.audience)}</span></div>
@@ -492,7 +496,7 @@ function renderDetail() {
 function renderEditor() {
   const existing = state.editingId === "new" ? null : state.announcements.find((item) => item.id === state.editingId);
   const canManageComments=!existing||state.session.role==="admin"||existing.author_id===state.session.id;
-  app.innerHTML = `${headerTemplate()}<main class="editor-shell blog-studio">
+  app.innerHTML = `${headerTemplate()}<main id="main-content" class="editor-shell blog-studio" tabindex="-1">
     <button class="back-button" id="cancel-edit">${icon("back", 18)} 取消並返回</button>
     <div class="editor-heading studio-heading"><div><span class="eyebrow dark">704 · PUBLISHING STUDIO · v0.14.1</span><h1>${existing ? "編輯公告" : "發布新公告"}</h1><p>寫下班級的新消息，讓重要的事被看見。</p></div><button type="button" class="secondary-button" id="focus-writing" aria-pressed="false">專注寫作</button></div>
     <form id="editor-form" class="editor-card studio-form">
@@ -700,9 +704,9 @@ async function refreshBanner() {
       }
       const masthead=document.querySelector(".login-masthead");
       document.querySelector(".login-marquee")?.remove();
-      if(masthead && state.marquee.enabled && state.marquee.content){const ticker=document.createElement("div");ticker.className="login-marquee site-marquee";ticker.innerHTML=`<strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee>`;masthead.after(ticker);}
+      if(masthead && state.marquee.enabled && state.marquee.content){const ticker=document.createElement("div");ticker.className="login-marquee site-marquee";ticker.innerHTML=`<strong>最新消息</strong><span>${escapeHtml(state.marquee.content)}</span>`;masthead.after(ticker);}
     }
-    if(state.session){const topbar=document.querySelector(".topbar");document.querySelector(".site-marquee:not(.login-marquee)")?.remove();if(topbar&&state.marquee.enabled&&state.marquee.content){const ticker=document.createElement("div");ticker.className="site-marquee";ticker.setAttribute("role","status");ticker.innerHTML=`<strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee>`;topbar.after(ticker);}}
+    if(state.session){const topbar=document.querySelector(".topbar");document.querySelector(".site-marquee:not(.login-marquee)")?.remove();if(topbar&&state.marquee.enabled&&state.marquee.content){const ticker=document.createElement("div");ticker.className="site-marquee";ticker.setAttribute("role","status");ticker.innerHTML=`<strong>最新消息</strong><span>${escapeHtml(state.marquee.content)}</span>`;topbar.after(ticker);}}
   } catch {
     // Login remains usable if the public banner endpoint is temporarily unavailable.
   }
@@ -725,7 +729,7 @@ function bindComments(item){
  form.addEventListener("submit",async event=>{event.preventDefault();const button=form.querySelector("button"),content=new FormData(form).get("content");button.disabled=true;try{await cloud.addComment(item.id,content);form.reset();await load();}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
  list.addEventListener("click",async event=>{const button=event.target.closest("[data-delete-comment]");if(!button)return;if(button.dataset.confirmed!=="yes"){button.dataset.confirmed="yes";button.textContent="確定刪除評論";return;}button.disabled=true;try{await cloud.deleteComment(item.id,button.dataset.deleteComment);await load();}catch(error){message.textContent=error.message;button.disabled=false;}});load();
 }
-function settingsTabs(){return `<nav class="settings-tabs" aria-label="設定分類"><button class="secondary-button" data-settings-tab="personal" aria-selected="${state.settingsTab==="personal"}">個人化</button><button class="secondary-button" data-settings-tab="account" aria-selected="${state.settingsTab==='account'}">帳號管理</button><button class="secondary-button" data-settings-tab="notifications" aria-selected="${state.settingsTab==='notifications'}">通知</button>${["teacher","admin"].includes(state.session.role)?`<button class="secondary-button" data-settings-tab="site" aria-selected="${state.settingsTab==="site"}">網站設定</button>`:""}</nav>`;}
+function settingsTabs(){return `<nav class="settings-tabs" aria-label="設定分類"><button class="secondary-button" data-settings-tab="personal" aria-current="${state.settingsTab==="personal"?'page':'false'}">個人化</button><button class="secondary-button" data-settings-tab="account" aria-current="${state.settingsTab==='account'?'page':'false'}">帳號管理</button><button class="secondary-button" data-settings-tab="notifications" aria-current="${state.settingsTab==='notifications'?'page':'false'}">通知</button>${["teacher","admin"].includes(state.session.role)?`<button class="secondary-button" data-settings-tab="site" aria-current="${state.settingsTab==="site"?'page':'false'}">網站設定</button>`:""}</nav>`;}
 function bindSettingsTabs(){document.querySelectorAll("[data-settings-tab]").forEach(button=>button.addEventListener("click",()=>{state.settingsTab=button.dataset.settingsTab;render();}));}
 function renderSettings(){if(state.settingsTab==="site"&&["teacher","admin"].includes(state.session.role))return renderSiteSettings();if(state.settingsTab==='account')return renderStudentAccount();return renderPersonalization();}
 function renderStudentAccount(){
@@ -770,7 +774,7 @@ function renderPersonalization(){
  form.querySelector('.editor-footer span').textContent=accountView?'儲存後套用頭像與暱稱。':'風格可即時預覽，按儲存才會保存到帳號。';
 }
 function renderSiteSettings() {
-  app.innerHTML = `${headerTemplate()}<main class="editor-shell settings-shell">${settingsTabs()}
+  app.innerHTML = `${headerTemplate()}<main id="main-content" class="editor-shell settings-shell" tabindex="-1">${settingsTabs()}
     <button class="back-button" id="close-settings">${icon("back",18)} 返回</button>
     <div class="editor-heading"><span class="eyebrow dark">PORTAL SETTINGS</span><h1>設定</h1>
     <p>教師與維護人員共用設定，會套用至三個登入入口。</p></div>
