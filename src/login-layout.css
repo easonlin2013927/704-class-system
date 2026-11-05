@@ -1,0 +1,59 @@
+/* Isolated login layout. This file intentionally loads last to neutralize legacy rules. */
+.login-shell{
+  position:relative!important;
+  width:100%!important;
+  min-height:100dvh!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:auto auto minmax(0,1fr) auto!important;
+  grid-auto-flow:row!important;
+  overflow:auto!important;
+}
+.login-shell>.login-masthead,
+.login-shell>.login-marquee,
+.login-shell>.login-center,
+.login-shell>.login-footnote{
+  grid-column:1!important;
+  width:100%!important;
+  min-width:0!important;
+}
+.login-shell>.login-masthead{grid-row:1!important}
+.login-shell>.login-marquee{grid-row:2!important}
+.login-shell>.login-center{grid-row:3!important}
+.login-shell>.login-footnote{grid-row:4!important}
+.login-center{
+  max-width:1120px!important;
+  min-height:0!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) minmax(340px,420px)!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:clamp(36px,8vw,96px)!important;
+  margin:auto!important;
+}
+.login-center:has(.login-slogan[hidden]){
+  grid-template-columns:minmax(340px,420px)!important;
+}
+.login-slogan{
+  width:auto!important;
+  max-width:650px!important;
+  min-width:0!important;
+  padding:0!important;
+  writing-mode:horizontal-tb!important;
+  overflow-wrap:anywhere!important;
+}
+.login-panel{
+  width:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  display:block!important;
+  place-items:initial!important;
+  padding:0!important;
+}
+.login-card{width:100%!important;min-width:0!important;max-width:none!important}
+.login-footnote{display:flex!important;justify-content:center!important}
+@media (max-width:720px){
+  .login-shell{grid-template-rows:auto auto minmax(0,1fr) auto!important}
+  .login-center,.login-center:has(.login-slogan[hidden]){grid-template-columns:minmax(0,1fr)!important;gap:30px!important}
+  .login-slogan{max-width:100%!important}
+}
