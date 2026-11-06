@@ -1,19 +1,19 @@
-import { cloud } from "./cloud.js?v=0.24.0";
+import { cloud } from "./cloud.js?v=0.25.0";
 import {summarize,exportBroadcast} from './broadcast.js?v=0.21.0';
 import {mountMailboxes} from './mailboxes.js?v=0.21.0';
 import {mountMailTest} from './mail-test.js?v=0.21.0';
 import { portals, portalRole } from "./portal.js?v=0.21.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.22.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.24.0';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.25.0';
 
 let activeRole = portalRole(location.hash);
-function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest?v=0.24.0':'./src/student.webmanifest?v=0.24.0';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js?v=0.24.0',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});}
+function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest?v=0.25.0':'./src/student.webmanifest?v=0.25.0';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js?v=0.25.0',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});}
 setupPwa(activeRole);
 const isPwaWindow=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;if(activeRole!=='admin')render();});
 window.addEventListener('appinstalled',()=>{installPrompt=null;render();});
-function renderInstallGuide(){const role=activeRole==='teacher'?'教師端':'學生端';document.title=`${role}安裝｜704班級系統`;app.innerHTML=`<main class="login-shell"><div class="login-center"><section class="login-panel"><div class="login-card"><img src="./src/logo.svg" width="72" height="72" alt="704班級系統"><h1>請使用 ${role} PWA</h1><p>若已安裝，請從裝置的主畫面或應用程式清單開啟「704${activeRole==='teacher'?'教師':'學生'}」。</p><p>若尚未安裝，請使用瀏覽器的安裝功能。iPhone／iPad 請在 Safari 按「分享」，再選「加入主畫面」。</p>${installPrompt?'<button class="primary-button" id="install-pwa">安裝應用程式</button>':''}</div></section></div></main>`;document.querySelector('#install-pwa')?.addEventListener('click',async()=>{if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;render();}});}
+function renderInstallGuide(){const role=activeRole==='teacher'?'教師端':'學生端',appName=`704${activeRole==='teacher'?'教師':'學生'}`;document.title=`${role}安裝｜704班級系統`;app.innerHTML=`<main class="install-gate"><section class="install-card"><div class="install-brand"><img src="./src/logo.svg" width="96" height="96" alt=""><div><span>704 CLASS SYSTEM</span><strong>704班級系統</strong></div></div><p class="install-kicker">${role}專用應用程式</p><h1>從應用程式進入班級系統</h1><p>已安裝時，請從主畫面或應用程式清單開啟「${appName}」。尚未安裝時，使用下方按鈕或瀏覽器的安裝功能。</p><div class="install-actions">${installPrompt?'<button class="primary-button" id="install-pwa">安裝 '+appName+'</button>':''}<a class="secondary-button" href="https://github.com/easonlin2013927/704-class-system/wiki" target="_blank" rel="noopener">查看安裝說明</a></div><p class="install-ios">iPhone／iPad：在 Safari 按「分享」→「加入主畫面」。</p></section></main>`;document.querySelector('#install-pwa')?.addEventListener('click',async()=>{if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;render();}});}
 window.addEventListener("hashchange", () => {
   cloud.logout();
   state.session = null;
@@ -25,6 +25,8 @@ window.addEventListener("hashchange", () => {
   setupPwa(activeRole);
   render();
 });
+window.addEventListener('open-announcement',event=>{state.schoolView='home';state.settingsOpen=false;state.editingId=null;state.selectedId=event.detail;render();});
+window.addEventListener('open-accounts',()=>{if(['admin','teacher'].includes(state.session?.role)){state.schoolView='home';state.adminView='accounts';render();}});
 
 const categories = {
   important: { label: "重要通知", tone: "rose" },
@@ -243,7 +245,8 @@ function renderLogin() {
     try {
       const profile = await cloud.login(data.get("account"), data.get("password"), activeRole, data.has("remember"));
       if ((profile.role === "assistant" ? "teacher" : profile.role) !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
-      state.session = { ...profile, name: profile.display_name };
+      const access=await cloud.school('permissions').catch(()=>null);
+      state.session = { ...profile, name: profile.display_name,permissions:access?.permissions||{} };
       state.schoolView = 'home';
       if(!profile.must_change_password){const boxes=await cloud.school('mailboxes').catch(()=>null);if(boxes&&!boxes.some(x=>x.verified)){state.settingsOpen=true;state.settingsTab='account';}}
       if(!profile.must_change_password&&!profile.must_add_email&&!profile.must_change_email){state.announcements = await cloud.list();state.countdowns = await cloud.countdowns();}
@@ -313,7 +316,7 @@ function renderAccounts() {
  ${isAdmin?'<label class="check-option"><input name="must_add_email" type="checkbox">要求下次登入時新增 email</label><label class="check-option"><input name="require_change_email" type="checkbox">要求下次登入變更 email</label><label id="required-email-label" hidden>選擇要變更的 email<select name="must_change_email"><option value="">請選擇</option></select></label>':''}
  <label class="check-option"><input name="disabled" type="checkbox">停用帳戶</label>
  <footer class="editor-footer"><span>編輯後，該帳號需重新登入。</span><button class="primary-button" id="save-person">建立帳號</button></footer>
- </form>${isAdmin?'<section id="admin-mailboxes" class="editor-card" hidden></section>':''}</dialog>
+ </form>${isAdmin?'<section id="permission-editor" class="editor-card" hidden><h2>功能權限</h2><p>可依帳號細分公告、作業、成績、紀錄、檢舉、帳號、全員通知與聊天管理權限。</p><div id="permission-fields" class="permission-grid"></div><p id="permission-message" role="status"></p></section><section id="admin-mailboxes" class="editor-card" hidden></section>':''}</dialog>
  <section class="editor-card"><h2>現有帳號</h2><label>篩選帳號<select id="account-filter"><option value="all">全部</option><option value="student">學生</option><option value="teacher">教師</option><option value="assistant">小老師</option><option value="admin">管理員</option><option value="disabled">已停用</option><option value="active">啟用中</option></select></label><p id="accounts-message" role="status">載入中…</p><div id="accounts-list"></div></section></main>`;
  bindHeader();
  document.querySelector("#accounts-back").addEventListener("click",goHome);
@@ -322,7 +325,7 @@ function renderAccounts() {
  form.reset();form.elements.id.value=account?.id||"";
  form.elements.email.value=account?.email||"";form.elements.name.value=account?.display_name||"";form.elements.role.value=account?.role||"student";
  form.elements.disabled.checked=Boolean(account?.disabled);form.elements.must_change_password.checked=Boolean(account?.must_change_password);
- if(isAdmin){form.elements.must_add_email.checked=Boolean(account?.must_add_email);form.elements.require_change_email.checked=Boolean(account?.must_change_email);const box=document.querySelector('#admin-mailboxes');box.hidden=!account;document.querySelector('#required-email-label').hidden=!form.elements.require_change_email.checked;form.elements.must_change_email.innerHTML=account?'<option value="">請選擇</option>':'<option value="default">新建帳號的預設信箱</option>';if(account){mountMailboxes(box,account.id);cloud.school('mail-admin/'+account.id).then(rows=>{if(!dialog.open||form.elements.id.value!==account.id)return;form.elements.must_change_email.innerHTML='<option value="">請選擇</option>'+rows.map(x=>`<option value="${escapeHtml(x.id)}">${escapeHtml(x.address)}</option>`).join('');form.elements.must_change_email.value=account.must_change_email||'';}).catch(e=>toast(e.message,'error'));}}
+ if(isAdmin){form.elements.must_add_email.checked=Boolean(account?.must_add_email);form.elements.require_change_email.checked=Boolean(account?.must_change_email);const box=document.querySelector('#admin-mailboxes'),permissionEditor=document.querySelector('#permission-editor');box.hidden=!account;permissionEditor.hidden=!account;document.querySelector('#required-email-label').hidden=!form.elements.require_change_email.checked;form.elements.must_change_email.innerHTML=account?'<option value="">請選擇</option>':'<option value="default">新建帳號的預設信箱</option>';if(account){mountMailboxes(box,account.id);cloud.school('mail-admin/'+account.id).then(rows=>{if(!dialog.open||form.elements.id.value!==account.id)return;form.elements.must_change_email.innerHTML='<option value="">請選擇</option>'+rows.map(x=>`<option value="${escapeHtml(x.id)}">${escapeHtml(x.address)}</option>`).join('');form.elements.must_change_email.value=account.must_change_email||'';}).catch(e=>toast(e.message,'error'));cloud.school('permissions/'+account.id).then(value=>{if(!dialog.open||form.elements.id.value!==account.id)return;const labels={publish:'發布公告',homework:'管理作業',grades:'管理成績',records:'學生紀錄',reports:'處理檢舉',accounts:'帳號管理',broadcast:'全員通知',chat_moderation:'聊天管理'};document.querySelector('#permission-fields').innerHTML=Object.entries(value.permissions).map(([key,enabled])=>`<label class="check-option"><input type="checkbox" data-permission="${key}" ${enabled?'checked':''}>${labels[key]||key}</label>`).join('');document.querySelector('#permission-message').textContent='';}).catch(e=>document.querySelector('#permission-message').textContent=e.message);}}
  form.elements.password.disabled=Boolean(account);
  document.querySelector("#reset-password-option").hidden=!account;
  document.querySelector("#person-form-title").textContent=account?"編輯帳號":"新增帳號";
@@ -347,6 +350,7 @@ function renderAccounts() {
  data.reset_password=form.elements.reset_password.checked;button.disabled=true;
  try{
  const result=id?await cloud.updateAccount(id,data):await cloud.createAccount(data);
+ if(isAdmin&&id){const permissions={};document.querySelectorAll('[data-permission]').forEach(input=>permissions[input.dataset.permission]=input.checked);if(Object.keys(permissions).length)await cloud.school('permissions/'+id,'PUT',permissions);}
  dialog.close();
  if(result.reauthenticate){cloud.logout();state.session=null;render();toast("帳號已更新，請重新登入");return;}
  toast(id?"帳號已更新":"帳號已建立");await refresh();
@@ -405,7 +409,7 @@ function renderDashboard() {
     <main id="main-content" class="page-shell" tabindex="-1">
       <section class="hero-row">
         <div><h1>${isTeacher ? "公告管理" : "公告"}</h1><p>${isTeacher ? "清楚傳遞每一項班級資訊。" : "今天也別忘了看看班級的新消息。"}</p></div>
-        ${isTeacher ? `<div class="create-menu"><button class="primary-button" id="create-toggle" aria-expanded="false" aria-controls="create-options">${icon("plus",18)} 新增</button><div id="create-options" class="create-options" hidden><button id="new-post">公告</button><button id="new-activity">活動</button><button data-school-create="homework">作業</button>${['teacher','admin'].includes(state.session.role)?'<button data-school-create="missing">缺交項目</button><button data-school-create="feedback">個別評語／提醒</button>':''}</div></div>` : ""}
+        ${isTeacher ? `<div class="create-menu"><button class="primary-button" id="create-toggle" aria-expanded="false" aria-controls="create-options">${icon("plus",18)} 新增</button><div id="create-options" class="create-options" hidden>${state.session.permissions?.publish!==false?'<button id="new-post">公告</button><button id="new-activity">活動</button>':''}${state.session.permissions?.homework!==false?'<button data-school-create="homework">作業</button>':''}${['teacher','admin'].includes(state.session.role)&&state.session.permissions?.records!==false?'<button data-school-create="missing">缺交項目</button><button data-school-create="feedback">個別評語／提醒</button>':''}</div></div>` : ""}
       </section>
       <div id="student-home-overview"></div>
       <section class="toolbar" aria-label="公告篩選">
@@ -463,7 +467,7 @@ function announcementCard(item, isTeacher) {
   const category = categories[item.category];
   const excerpt = stripHtml(item.content).slice(0, 112);
   return `<article class="announcement-card ${item.pinned ? "pinned" : ""}" data-open="${item.id}" tabindex="0">
-    <div class="card-meta"><span class="category-tag ${category.tone}">${item.pinned ? icon("pin", 13) : ""}${category.label}</span><time>${formatDate(item.date)}</time></div>
+    <div class="card-meta"><span class="category-tag ${category.tone}">${item.pinned ? icon("pin", 13) : ""}${category.label}</span>${isTeacher&&item.workflow_status!=='published'?`<span class="status-badge">${item.workflow_status==='draft'?'草稿':'排程中'}</span>`:''}<time>${formatDate(item.publish_at||item.date)}</time></div>
     <h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(excerpt)}${stripHtml(item.content).length > 112 ? "…" : ""}</p>
     <footer><div class="author">${avatarMarkup(item.author,item.author_avatar,"mini")}<span><strong>${escapeHtml(identityName(item.author,item.author_nickname))}</strong><small>${escapeHtml(item.audience)}</small></span></div>
     ${isTeacher ? `<div class="card-actions"><button data-edit="${item.id}" title="編輯" aria-label="編輯公告：${escapeHtml(item.title)}">${icon("edit", 17)}</button><button class="danger" data-delete="${item.id}" title="刪除" aria-label="刪除公告：${escapeHtml(item.title)}">${icon("trash", 17)}</button></div>` : `<span class="read-more">閱讀全文 ${icon("arrow", 16)}</span>`}</footer>
@@ -482,11 +486,12 @@ function renderDetail() {
       <h1>${escapeHtml(item.title)}</h1><div class="article-byline">${avatarMarkup(item.author,item.author_avatar)}<div><strong>${escapeHtml(identityName(item.author,item.author_nickname))}</strong><span>${icon("clock", 14)} 發布於 ${formatDate(item.date, true)}</span></div></div></header>
       <div class="rich-content">${sanitizeHtml(item.content)}</div>
       <section class="attachment-section"><h2>附件</h2><div id="attachment-list">載入中…</div></section>
-      ${isTeacher ? `<footer class="article-controls"><button class="secondary-button" id="edit-post">${icon("edit", 17)} 編輯公告</button><button class="danger-button" id="delete-post">${icon("trash", 17)} 刪除</button></footer>` : ""}
+      ${isTeacher ? `<section class="read-status"><h2>閱讀狀態</h2><p id="read-status-message">載入中…</p><div id="read-status-list"></div></section><footer class="article-controls"><button class="secondary-button" id="edit-post">${icon("edit", 17)} 編輯公告</button><button class="danger-button" id="delete-post">${icon("trash", 17)} 刪除</button></footer>` : ""}
     </article><section class="editor-card comments-panel" aria-label="公告評論"><h2>評論</h2><p id="comments-message" role="status">載入評論中…</p><div id="comments-list"></div><form id="comment-form" class="comment-form" hidden><label for="comment-content">發表評論</label><textarea id="comment-content" name="content" maxlength="2000" required placeholder="輸入評論…"></textarea><button class="primary-button">送出評論</button></form></section>
   </main>`;
   bindHeader();
   bindComments(item);
+  cloud.school('announcement-reads/'+item.id,isTeacher?'GET':'POST',isTeacher?undefined:{}).then(value=>{if(!isTeacher)return;const message=document.querySelector('#read-status-message'),list=document.querySelector('#read-status-list');if(!message?.isConnected)return;message.textContent=`${value.read} / ${value.total} 位學生已讀`;list.innerHTML=`<div class="read-people">${value.people.map(person=>`<span class="status-badge ${person.read_at?'':'disabled'}">${escapeHtml(identityName(person.display_name,person.nickname))} · ${person.read_at?'已讀':'未讀'}</span>`).join('')}</div>`;}).catch(error=>{const message=document.querySelector('#read-status-message');if(message)message.textContent=error.message;});
   const attachmentList=document.querySelector('#attachment-list');cloud.attachments(item.id).then(rows=>{if(!attachmentList.isConnected)return;attachmentList.innerHTML=rows.length?rows.map(a=>`<p><button class="secondary-button" type="button" data-download-attachment="${escapeHtml(a.id)}">${escapeHtml(a.name)}（${a.size>=1048576?(a.size/1048576).toFixed(1)+' MB':Math.ceil(a.size/1024)+' KB'}）</button></p>`).join(''):'沒有附件';attachmentList.querySelectorAll('[data-download-attachment]').forEach(b=>b.onclick=()=>cloud.downloadAttachment(b.dataset.downloadAttachment));}).catch(e=>{attachmentList.textContent=e.message;});
   document.querySelector("#back").addEventListener("click", () => { state.selectedId = null; render(); });
   document.querySelector("#edit-post")?.addEventListener("click", () => { state.editingId = item.id; state.selectedId = null; render(); });
@@ -515,6 +520,9 @@ function renderEditor() {
       </div>
       <div class="editor-options"><label class="switch-row"><input type="checkbox" name="pinned" ${existing?.pinned ? "checked" : ""}><span class="switch"></span><span><strong>置頂公告</strong><small>讓這則公告優先顯示在列表最上方</small></span></label></div>
       ${canManageComments?`<label class="check-option"><input type="checkbox" name="comments_enabled" ${existing?.comments_enabled?"checked":""}>開啟評論區</label>`:'<p class="muted">評論區開關由公告張貼者或管理員設定。</p>'}
+      <label>發布狀態<select name="workflow_status"><option value="published" ${(existing?.workflow_status||'published')==='published'?'selected':''}>立即發布</option><option value="draft" ${existing?.workflow_status==='draft'?'selected':''}>儲存為草稿</option><option value="scheduled" ${existing?.workflow_status==='scheduled'?'selected':''}>排程發布</option></select></label>
+      <label id="publish-at-field">排程發布時間<input name="publish_at" type="datetime-local" value="${existing?.publish_at?new Date(new Date(existing.publish_at).getTime()-new Date(existing.publish_at).getTimezoneOffset()*60000).toISOString().slice(0,16):''}"></label>
+      <label>自動下架時間（選填）<input name="expires_at" type="datetime-local" value="${existing?.expires_at?new Date(new Date(existing.expires_at).getTime()-new Date(existing.expires_at).getTimezoneOffset()*60000).toISOString().slice(0,16):''}"></label>
       <label>新增附件（每個檔案最多 400 MB）<input type="file" id="announcement-files" multiple></label>
       <button class="primary-button studio-publish" type="submit">${existing ? "儲存變更" : "發布公告"}</button><p class="studio-save-note">內容在按下${existing ? "儲存" : "發布"}後才會保存至雲端。</p></div>
       <div class="studio-panel"><h2>文章概覽</h2><p id="article-summary" class="muted"></p><h3>文章大綱</h3><ul id="article-outline" class="studio-outline"></ul></div>
@@ -528,6 +536,7 @@ function renderEditor() {
   document.querySelector("#cancel-edit-bottom").addEventListener("click", cancel);
   const editor = bindRichEditor();
   const form = document.querySelector("#editor-form");
+  const workflowField=()=>{document.querySelector('#publish-at-field').hidden=form.elements.workflow_status.value!=='scheduled';form.elements.publish_at.required=form.elements.workflow_status.value==='scheduled';};form.elements.workflow_status.addEventListener('change',workflowField);workflowField();
   const updateWriting = () => {
     const text = stripHtml(editor.innerHTML).trim();
     const count = Array.from(text.replace(/\s/g, "")).length;
@@ -565,6 +574,7 @@ function renderEditor() {
       id: existing?.id || crypto.randomUUID(), title: data.get("title").trim(), category: data.get("category"),
       author: state.session.name, authorInitial: state.session.name.charAt(0), audience: data.get("audience"),
       date: existing?.date || new Date().toISOString(), pinned: data.get("pinned") === "on", content: sanitizeHtml(editor.innerHTML),
+      workflow_status:data.get('workflow_status'),publish_at:data.get('workflow_status')==='scheduled'?new Date(data.get('publish_at')).toISOString():null,expires_at:data.get('expires_at')?new Date(data.get('expires_at')).toISOString():null,
     };
     if(canManageComments)announcement.comments_enabled=data.get("comments_enabled")==="on";
     const publishButtons = form.querySelectorAll('[type="submit"]');
@@ -720,7 +730,7 @@ function bindStatusTable(){
 }
 function identityName(name,nickname){return nickname?.trim()?`${name}（${nickname.trim()}）`:name;}
 function avatarMarkup(name,url,size=""){
- const safe=typeof url==="string"&&/^data:image\/(png|jpeg|webp);base64,/.test(url);
+ const safe=typeof url==="string"&&(/^data:image\/(png|jpeg|webp);base64,/.test(url)||/^https:\/\/704-announcement-api\.easonlin2013927\.workers\.dev\/school\/profile-files\/[0-9a-f-]{36}$/i.test(url));
  return `<span class="avatar ${size}" role="img" aria-label="${escapeHtml(name||"使用者")}的頭像">${safe?`<img src="${escapeHtml(url)}" alt="">`:escapeHtml(Array.from((name||"?").trim())[0]||"?")}</span>`;
 }
 function bindComments(item){
@@ -748,7 +758,10 @@ function renderPersonalization(){
  bindHeader();bindSettingsTabs();
  const form=document.querySelector("#profile-form"),file=document.querySelector("#avatar-file"),message=document.querySelector("#profile-message"),save=document.querySelector("#save-profile");
  form.insertAdjacentHTML('afterend',`<form id="notification-settings" class="editor-card"><h2>通知設定</h2><p>選擇要接收的通知類型。裝置通知需在安裝後開啟，並允許系統通知權限。</p><label class="check-option"><input type="checkbox" name="announcements">公告</label><label class="check-option"><input type="checkbox" name="homework">作業</label><input type="checkbox" name="points" hidden><label class="check-option"><input type="checkbox" name="feedback">評語與提醒</label><button class="primary-button">儲存通知設定</button><button class="secondary-button" type="button" id="enable-push">啟用此裝置通知</button><button class="secondary-button" type="button" id="disable-push">停用此裝置通知</button><p role="status" id="notification-settings-message">載入中…</p></form>`);
+ document.querySelector('#notification-settings').insertAdjacentHTML('afterend',`<form id="digest-settings" class="editor-card"><h2>電子郵件摘要</h2><p>選擇即時寄送、每日摘要或每週摘要。每週五排行榜信不受此設定影響。</p><label>寄送頻率<select name="frequency"><option value="immediate">每則通知即時寄送</option><option value="daily">每日晚上 8 點摘要</option><option value="weekly">每週五晚上 8 點摘要</option></select></label><button class="primary-button">儲存摘要設定</button><p id="digest-message" role="status">載入中…</p></form><section id="security-center" class="editor-card"><h2>帳號安全中心</h2><p>查看登入中的裝置，並可讓不認識的裝置立即登出。</p><div id="security-sessions">載入中…</div></section>`);
  const notificationsForm=document.querySelector('#notification-settings'),notificationsMessage=document.querySelector('#notification-settings-message');cloud.school('notification-settings').then(value=>{for(const key of ['announcements','homework','points','feedback'])notificationsForm.elements[key].checked=value[key];notificationsMessage.textContent='';}).catch(error=>{notificationsMessage.textContent=error.message;});notificationsForm.onsubmit=async event=>{event.preventDefault();try{const value={};for(const key of ['announcements','homework','points','feedback'])value[key]=notificationsForm.elements[key].checked;await cloud.school('notification-settings','PUT',value);notificationsMessage.textContent='通知設定已儲存';}catch(error){notificationsMessage.textContent=error.message;}};
+ const digestForm=document.querySelector('#digest-settings'),digestMessage=document.querySelector('#digest-message');cloud.school('digest-settings').then(value=>{digestForm.elements.frequency.value=value.frequency;digestMessage.textContent='';}).catch(error=>digestMessage.textContent=error.message);digestForm.onsubmit=async event=>{event.preventDefault();try{await cloud.school('digest-settings','PUT',{frequency:digestForm.elements.frequency.value});digestMessage.textContent='摘要設定已儲存';}catch(error){digestMessage.textContent=error.message;}};
+ const securityHost=document.querySelector('#security-sessions');const loadSessions=async()=>{try{const rows=await cloud.school('security-sessions');securityHost.innerHTML=rows.map(row=>`<div class="session-row"><div><strong>${row.current?'目前裝置':'已登入裝置'}</strong><small>${escapeHtml(row.user_agent||'未知瀏覽器')} · 最近使用 ${formatDate(row.last_seen,true)}</small></div>${row.current?'<span class="status-badge">目前使用中</span>':`<button class="danger-button" data-revoke-session="${row.session_id}">登出此裝置</button>`}</div>`).join('')||'<p>沒有登入工作階段。</p>';securityHost.querySelectorAll('[data-revoke-session]').forEach(button=>button.onclick=async()=>{button.disabled=true;try{await cloud.school('security-sessions/'+button.dataset.revokeSession,'DELETE');await loadSessions();}catch(error){toast(error.message,'error');button.disabled=false;}});}catch(error){securityHost.textContent=error.message;}};loadSessions();
  document.querySelector('#enable-push').onclick=async()=>{try{if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))throw Error('此裝置不支援推播，請確認已安裝應用程式');const permission=await Notification.requestPermission();if(permission!=='granted')throw Error('尚未允許裝置通知');const registration=await navigator.serviceWorker.register('./service-worker.js');const key=await cloud.school('push-key');const b64=key.public_key.replace(/-/g,'+').replace(/_/g,'/');const bytes=Uint8Array.from(atob(b64+'='.repeat((4-b64.length%4)%4)),c=>c.charCodeAt(0));const subscription=await registration.pushManager.getSubscription()||await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:bytes});await cloud.school('push-subscription','POST',subscription.toJSON());notificationsMessage.textContent='此裝置通知已啟用';}catch(error){notificationsMessage.textContent=error.message;}};
  document.querySelector('#disable-push').onclick=async()=>{try{const registration=await navigator.serviceWorker.getRegistration('./');const subscription=await registration?.pushManager.getSubscription();if(subscription){await cloud.school('push-subscription','DELETE',{endpoint:subscription.endpoint});await subscription.unsubscribe();}notificationsMessage.textContent='此裝置通知已停用';}catch(error){notificationsMessage.textContent=error.message;}};
  form.insertAdjacentHTML('afterend',`<form id="wallpaper-form" class="editor-card"><h2>全站桌布</h2><p>可上傳靜態圖片或動態 GIF，單一檔案最多 400 MB。</p><input id="wallpaper-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><div class="school-actions"><button class="primary-button" type="submit">儲存桌布</button><button class="secondary-button" type="button" id="wallpaper-remove">移除桌布</button></div><p id="wallpaper-message" role="status"></p></form>`);
@@ -768,6 +781,8 @@ function renderPersonalization(){
  form.hidden=notificationView;
  wallpaperForm.hidden=accountView||notificationView;
  notificationsForm.hidden=!notificationView;
+ digestForm.hidden=!notificationView;
+ document.querySelector('#security-center').hidden=!accountView;
  document.querySelector('.editor-heading h1').textContent=notificationView?'通知':accountView?'帳號管理':'個人化';
  document.querySelector('.editor-heading p').textContent=notificationView?'驗證必要的電子郵件信箱，並管理選用的裝置通知。':accountView?'管理暱稱、頭像與密碼。':'選擇系統風格與全站桌布。';
  save.textContent=accountView?'儲存個人資料':'儲存系統風格';
@@ -843,4 +858,4 @@ function mountBroadcast(){
 
 render();
 refreshBanner();
-if(activeRole==='admin'||isPwaWindow())cloud.me().then(async profile=>{if((profile.role==='assistant'?'teacher':profile.role)!==activeRole)return;state.session={...profile,name:profile.display_name};if(!profile.must_change_password&&!profile.must_add_email&&!profile.must_change_email){state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();const boxes=await cloud.school('mailboxes').catch(()=>null);if(boxes&&!boxes.some(x=>x.verified)){state.settingsOpen=true;state.settingsTab='account';}}render();}).catch(()=>{});
+if(activeRole==='admin'||isPwaWindow())cloud.me().then(async profile=>{if((profile.role==='assistant'?'teacher':profile.role)!==activeRole)return;const access=await cloud.school('permissions').catch(()=>null);state.session={...profile,name:profile.display_name,permissions:access?.permissions||{}};if(!profile.must_change_password&&!profile.must_add_email&&!profile.must_change_email){state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();const boxes=await cloud.school('mailboxes').catch(()=>null);if(boxes&&!boxes.some(x=>x.verified)){state.settingsOpen=true;state.settingsTab='account';}}render();}).catch(()=>{});

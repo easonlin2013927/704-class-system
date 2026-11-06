@@ -101,6 +101,7 @@ async function visibleAnnouncement(id,user){
  if(!row)fail(404,'找不到公告');
  const audiences=visibleAudience(user);
  if(audiences&&!audiences.includes(row.audience))fail(403,'無法查看這則公告');
+ if(audiences&&(row.workflow_status!=='published'||(row.publish_at&&new Date(row.publish_at)>new Date())||(row.expires_at&&new Date(row.expires_at)<=new Date())))fail(404,'找不到公告');
  return row;
 }
 

@@ -1,5 +1,15 @@
 # 704班級系統
 
+## v0.25.0 班級工作台與 PWA 品牌更新
+
+- 更新學生端與教師端 PWA 安裝頁、應用程式圖示與 704 班級徽章，修正舊圖示尺寸小、位置突兀及快取未更新的問題。
+- 新增全站搜尋、公告草稿與排程發布、公告閱讀狀態，以及依帳號細分的功能權限。
+- 強化作業簿（補充說明、參考資源、繳交方式、學生提交與教師查看）及成績簿（滿分、權重、可見性與加權統計）。
+- 新增帳號安全中心、聊天封鎖與限時編輯，以及每日／每週 HTML 電子郵件摘要。
+- 導覽改為主要功能加「更多功能」，統一載入、成功、警告及失敗狀態的呈現。
+
+固定入口：[學生端](https://easonlin2013927.github.io/704-class-system/?app=student#/student/login) · [教師／小老師端](https://easonlin2013927.github.io/704-class-system/?app=teacher#/teacher/login) · [管理員端](https://easonlin2013927.github.io/704-class-system/#/admin/login)
+
 ## v0.15.0 班級功能與固定入口
 
 前端使用固定 [704 班級系統網址](https://easonlin2013927.github.io/704-class-system/?app=student#/student/login)，API 改用 Cloudflare Workers：`https://704-announcement-api.easonlin2013927.workers.dev`。原主機與 PostgreSQL 資料繼續使用，沒有搬移帳號資料。部署與容量限制見 [Worker 維護說明](deploy/worker/README.md)。

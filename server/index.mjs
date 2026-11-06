@@ -10,8 +10,8 @@ import {migrateMail,mailAddress,mailStatus,requestMailVerification,confirmMailVe
 import {migrateMailboxes,listMailboxes,createMailbox,updateMailbox,deleteMailbox,confirmMailbox} from './mailboxes.mjs';
 import {migrateMailDeliveries,processMultiMail} from './multi-mail-worker.mjs';
 import {createMailTest,getMailTest,latestMailTest} from './mail-tests.mjs';
-import {migrateMailEvents,markPresence,scheduleWeeklyRanking} from './mail-events.mjs';
-import {migrateEnhancements,enhancementRoutes,authorizeEnhancedSchoolRoute,publishScheduledAnnouncements,cleanupExpiredChatFiles,serveProfileFile} from './enhancements.mjs';
+import {migrateMailEvents,markPresence,scheduleWeeklyRanking,scheduleDigests} from './mail-events.mjs';
+import {migrateEnhancements,enhancementRoutes,authorizeEnhancedSchoolRoute,publishScheduledAnnouncements,cleanupExpiredChatFiles,serveProfileFile,permissionsFor} from './enhancements.mjs';
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
@@ -29,7 +29,7 @@ function validAvatar(value){
 async function visibleAnnouncement(client,id,user,lock=""){
  const row=(await client.query("select * from announcements704 where id=$1"+lock,[id])).rows[0];
  if(!row)fail(404,"找不到公告");
- if(user.role==="student"&&!["學生","全部人員","全校學生","七年級","八年級","九年級"].includes(row.audience))fail(403,"無法閱讀此公告");return row;
+ if(user.role==="student"&&(!["學生","全部人員","全校學生","七年級","八年級","九年級"].includes(row.audience)||row.workflow_status!=="published"||(row.publish_at&&new Date(row.publish_at)>new Date())||(row.expires_at&&new Date(row.expires_at)<=new Date())))fail(404,"找不到公告");return row;
 }
 async function body(req) {
  let data = ""; for await (const chunk of req) { data += chunk; if (Buffer.byteLength(data) > 262144) throw Object.assign(new Error("內容過長"),{status:413}); }
@@ -55,6 +55,8 @@ const broadcastTimer=setInterval(processBroadcasts,3000);broadcastTimer.unref();
 const mailTimer=setInterval(processMultiMail,15000);mailTimer.unref();
 const rankingMailTimer=setInterval(scheduleWeeklyRanking,60000);rankingMailTimer.unref();
 scheduleWeeklyRanking();
+const digestMailTimer=setInterval(scheduleDigests,60000);digestMailTimer.unref();
+scheduleDigests();
 const scheduledAnnouncementTimer=setInterval(()=>publishScheduledAnnouncements().catch(()=>console.error('Scheduled announcement publishing unavailable')),30000);scheduledAnnouncementTimer.unref();
 publishScheduledAnnouncements().catch(()=>{});
 const expiredChatFileTimer=setInterval(()=>cleanupExpiredChatFiles().catch(()=>console.error('Expired chat file cleanup unavailable')),60*60*1000);expiredChatFileTimer.unref();
@@ -146,7 +148,7 @@ const server = createServer(async (req,res) => {
  if(path==='/school/mail-test-latest'&&req.method==='GET')return send(200,await latestMailTest(user));
  const mailTestMatch=path.match(/^\/school\/mail-tests\/([0-9a-f-]{36})$/i);
  if(mailTestMatch&&req.method==='GET')return send(200,await getMailTest(user,mailTestMatch[1]));
- if(path==='/school/broadcasts'&&req.method==='POST'){const b=await body(req);return send(202,await createBroadcast(user,b.message));}
+ if(path==='/school/broadcasts'&&req.method==='POST'){if(!(await permissionsFor(user)).broadcast)fail(403,'此帳號沒有發送全員通知的權限');const b=await body(req);return send(202,await createBroadcast(user,b.message));}
  if(path==='/school/broadcast-latest'&&req.method==='GET')return send(200,await getBroadcast(user,'latest'));
  const broadcastMatch=path.match(/^\/school\/broadcasts\/(latest|[0-9a-f-]{36})$/i);
  if(broadcastMatch&&req.method==='GET')return send(200,await getBroadcast(user,broadcastMatch[1]));
@@ -184,6 +186,7 @@ const server = createServer(async (req,res) => {
  }
  if (path === "/admin/accounts" && ["GET","POST"].includes(req.method)) {
  if(!["admin","teacher"].includes(user.role)) fail(403,"僅限教師或管理員管理帳號");
+ if(!(await permissionsFor(user)).accounts)fail(403,'此帳號沒有管理帳號的權限');
  if(req.method==="GET") return send(200,(await db.query(["teacher","assistant"].includes(user.role) ? "select id,email,display_name,role,disabled,must_change_password,must_add_email,must_change_email from accounts704 where role='student' order by display_name" : "select id,email,display_name,role,disabled,must_change_password,must_add_email,must_change_email from accounts704 order by role,display_name")).rows);
  const value=await body(req);
  const email=typeof value.email==="string"?value.email.trim().toLowerCase():"";
@@ -200,6 +203,7 @@ const server = createServer(async (req,res) => {
  const accountMatch=path.match(/^\/admin\/accounts\/([0-9a-f-]{36})$/i);
  if(accountMatch && ["PATCH","DELETE"].includes(req.method)) {
  if(!["admin","teacher"].includes(user.role) || (req.method==="DELETE"&&user.role!=="admin")) fail(403,"沒有管理此帳號的權限");
+ if(!(await permissionsFor(user)).accounts)fail(403,'此帳號沒有管理帳號的權限');
  const value=req.method==="PATCH"?await body(req):{};
  const client=await db.connect();
  try{
@@ -275,6 +279,7 @@ const server = createServer(async (req,res) => {
  return send(200,(await db.query(query+(user.role==="student"?" where n.audience in ('學生','全部人員','全校學生','七年級','八年級','九年級') and n.workflow_status='published' and coalesce(n.publish_at,n.date)<=now() and (n.expires_at is null or n.expires_at>now())":"")+" order by n.pinned desc,n.date desc")).rows);
  }
  if(!["teacher","assistant","admin"].includes(user.role))fail(403,"僅限教師或管理員管理公告");
+ if(!(await permissionsFor(user)).publish)fail(403,'此帳號沒有發布公告的權限');
  const match=path.match(/^\/announcements\/([0-9a-f-]{36})$/i);
  if((path==="/announcements"&&req.method==="POST")||(match&&req.method==="PATCH")){
  const b=await body(req);
