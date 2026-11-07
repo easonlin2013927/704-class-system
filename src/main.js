@@ -1,13 +1,13 @@
-import { cloud } from "./cloud.js?v=0.25.0";
+import { cloud } from "./cloud.js?v=0.25.1";
 import {summarize,exportBroadcast} from './broadcast.js?v=0.21.0';
 import {mountMailboxes} from './mailboxes.js?v=0.21.0';
 import {mountMailTest} from './mail-test.js?v=0.21.0';
 import { portals, portalRole } from "./portal.js?v=0.21.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.22.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.25.0';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.25.1';
 
 let activeRole = portalRole(location.hash);
-function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest?v=0.25.0':'./src/student.webmanifest?v=0.25.0';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js?v=0.25.0',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});}
+function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest?v=0.25.1':'./src/student.webmanifest?v=0.25.1';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js?v=0.25.1',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});}
 setupPwa(activeRole);
 const isPwaWindow=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 let installPrompt=null;
@@ -804,7 +804,7 @@ function renderSiteSettings() {
       ${state.session.role === "admin" ? `<hr><h2>網站頂端跑馬公告</h2><label class="switch-row"><input id="marquee-enabled" type="checkbox"><span class="switch"></span><span><strong>顯示全站跑馬公告</strong><small>公告會顯示在登入頁與已登入頁面的最上方。</small></span></label><label class="editor-label" for="marquee-content">跑馬公告文字</label><textarea id="marquee-content" maxlength="1000" rows="3" placeholder="輸入要公告給全站的短訊息"></textarea><div class="editor-footer"><span>最多 1000 字；停用後內容仍會保留。</span><button id="save-marquee" class="secondary-button">儲存跑馬公告</button></div>` : ""}
     </div></section></main>`;
   bindHeader();bindSettingsTabs();
-  if(state.session.role==='admin') mountBroadcast();
+  if(state.session.role==='admin'){mountNotificationGate();mountBroadcast();}
   document.querySelector("#close-settings").addEventListener("click",goHome);
   bindStatusTable();
   const message = document.querySelector("#settings-message");
@@ -841,6 +841,14 @@ function renderSiteSettings() {
     } catch (error) { message.textContent = error.message; }
     finally { button.disabled = false; }
   });
+}
+
+function mountNotificationGate(){
+ const host=document.createElement('section');host.className='editor-card';host.innerHTML=`<h2>全站外部通知</h2><p>控制裝置推播與通知型電子郵件。關閉後，新通知仍會保留在每位使用者的系統收件閘；電子郵件驗證等帳號必要流程不受影響。</p><label class="switch-row"><input id="external-notification-enabled" type="checkbox"><span class="switch"></span><span><strong>允許系統發送外部通知</strong><small id="external-notification-description">正在讀取目前狀態…</small></span></label><p id="external-notification-status" role="status"></p>`;
+ const anchor=document.querySelector('.system-status');anchor.after(host);const toggle=host.querySelector('#external-notification-enabled'),description=host.querySelector('#external-notification-description'),status=host.querySelector('#external-notification-status');
+ const describe=value=>{toggle.checked=value.external_enabled;description.textContent=value.external_enabled?'已啟用：系統可依個人設定發送裝置推播與通知郵件。':'已關閉：系統只寫入收件閘，不會發送裝置推播或通知郵件。';};
+ cloud.school('notification-gate').then(describe).catch(error=>status.textContent=error.message);
+ toggle.onchange=async()=>{const next=toggle.checked;toggle.disabled=true;status.textContent='正在更新全站通知設定…';try{const value=await cloud.school('notification-gate','PUT',{external_enabled:next});describe(value);status.textContent=next?'外部通知已啟用。':'外部通知已關閉；等待中的通知郵件與推播不會補送。';}catch(error){toggle.checked=!next;status.textContent=error.message;}finally{toggle.disabled=false;}};
 }
 
 function mountBroadcast(){

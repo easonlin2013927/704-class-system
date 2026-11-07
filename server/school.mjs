@@ -34,6 +34,12 @@ export async function migrateSchool(){await db.query(`
  create table if not exists school_points(id uuid primary key,student_id uuid not null references accounts704(id) on delete cascade,author_id uuid references accounts704(id) on delete set null,amount integer not null,reason text not null,created_at timestamptz not null default now());
  create table if not exists school_attachments(id uuid primary key,announcement_id uuid not null references announcements704(id) on delete cascade,name text not null,owner_id uuid references accounts704(id) on delete set null,bytes bytea not null default ''::bytea,complete boolean not null default false,created_at timestamptz not null default now());
  create table if not exists school_notifications(id bigint generated always as identity primary key,account_id uuid not null references accounts704(id) on delete cascade,kind text not null,title text not null,created_at timestamptz not null default now(),read_at timestamptz);
+ create table if not exists school_notification_gate(id integer primary key check(id=1),external_enabled boolean not null default true,updated_at timestamptz not null default now(),updated_by uuid references accounts704(id) on delete set null);
+ insert into school_notification_gate(id) values(1) on conflict do nothing;
+ alter table school_notifications add column if not exists external_allowed boolean not null default true;
+ create or replace function school_apply_notification_gate() returns trigger language plpgsql as $$ begin new.external_allowed=coalesce((select external_enabled from school_notification_gate where id=1),true);return new;end $$;
+ drop trigger if exists school_notification_gate_insert on school_notifications;
+ create trigger school_notification_gate_insert before insert on school_notifications for each row execute function school_apply_notification_gate();
  create table if not exists school_notification_settings(account_id uuid primary key references accounts704(id) on delete cascade,announcements boolean not null default true,homework boolean not null default true,points boolean not null default true,feedback boolean not null default true);
  create table if not exists school_push_keys(id integer primary key check(id=1),public_key text not null,private_key text not null);
  create table if not exists school_push_subscriptions(endpoint text primary key,account_id uuid not null references accounts704(id) on delete cascade,subscription jsonb not null,created_at timestamptz not null default now());
@@ -68,6 +74,14 @@ export async function migrateSchool(){await db.query(`
  `);}
 export async function schoolRoutes({path,query,method,user,readBody,send}){
  const tail=path.slice('/school/'.length).split('/');const [resource,id,action]=tail;
+ if(resource==='notification-gate'){
+  requireRole(user.role==='admin');
+  if(method==='GET')return send(200,(await db.query('select external_enabled,updated_at from school_notification_gate where id=1')).rows[0]);
+  if(method==='PUT'){
+   const b=await readBody();if(typeof b.external_enabled!=='boolean')fail(400,'通知開關格式錯誤');
+   return send(200,await transaction(async c=>{const row=(await c.query('update school_notification_gate set external_enabled=$1,updated_at=now(),updated_by=$2 where id=1 returning external_enabled,updated_at',[b.external_enabled,user.id])).rows[0];if(!b.external_enabled){await c.query('update school_notifications set external_allowed=false where external_allowed');await c.query("update school_mail_queue set status='cancelled',last_error='全站外部通知已關閉' where status='pending' and kind<>'verification'");await c.query("update school_mail_deliveries set status='cancelled',last_error='全站外部通知已關閉' where status='pending'");await c.query("update broadcast_targets set status='disabled',reason='全站外部通知已關閉',subscription=null,updated_at=now() where status='pending'");}return row;}));
+  }
+ }
  if(resource==='push-key'&&method==='GET'){const key=(await db.query('select public_key from school_push_keys where id=1')).rows[0];if(!key)fail(503,'推播服務尚未啟用');return send(200,key);}
  if(resource==='push-subscription'){
   if(method==='POST'){const b=await readBody();let endpoint;try{endpoint=new URL(b.endpoint);}catch{fail(400,'推播訂閱格式錯誤');}const host=endpoint.hostname;if(endpoint.protocol!=='https:'||endpoint.port||endpoint.username||endpoint.password||!(host==='fcm.googleapis.com'||host==='updates.push.services.mozilla.com'||host.endsWith('.push.apple.com')||host.endsWith('.notify.windows.com'))||b.endpoint.length>2000||typeof b.keys?.p256dh!=='string'||typeof b.keys?.auth!=='string')fail(400,'推播訂閱格式錯誤');await db.query('insert into school_push_subscriptions(endpoint,account_id,subscription) values($1,$2,$3) on conflict(endpoint) do update set account_id=$2,subscription=$3,created_at=now()',[b.endpoint,user.id,b]);return send(200,{ok:true});}
