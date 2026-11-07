@@ -13,10 +13,10 @@ const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(v
 const text=(value,max=2000,required=true)=>{if(typeof value!=='string'||(required&&!value.trim())||value.length>max)fail(400,'輸入內容格式錯誤');return value.trim();};
 const staff=user=>['teacher','assistant','admin'].includes(user.role);
 const defaults={
- admin:{publish:true,homework:true,grades:true,records:true,reports:true,accounts:true,broadcast:true,chat_moderation:true},
- teacher:{publish:true,homework:true,grades:true,records:true,reports:true,accounts:true,broadcast:false,chat_moderation:false},
- assistant:{publish:true,homework:true,grades:false,records:false,reports:false,accounts:false,broadcast:false,chat_moderation:false},
- student:{publish:false,homework:false,grades:false,records:false,reports:false,accounts:false,broadcast:false,chat_moderation:false}
+ admin:{publish:true,homework:true,grades:true,records:true,reports:true,points:true,subjects:true,accounts:true,broadcast:true,chat_moderation:true,site_settings:true},
+ teacher:{publish:true,homework:true,grades:true,records:true,reports:true,points:true,subjects:false,accounts:true,broadcast:false,chat_moderation:false,site_settings:false},
+ assistant:{publish:true,homework:true,grades:false,records:false,reports:false,points:false,subjects:false,accounts:false,broadcast:false,chat_moderation:false,site_settings:false},
+ student:{publish:false,homework:false,grades:false,records:false,reports:false,points:false,subjects:false,accounts:false,broadcast:false,chat_moderation:false,site_settings:false}
 };
 export const permissionKeys=Object.keys(defaults.admin);
 
@@ -87,14 +87,22 @@ export async function permissionsFor(user){
 }
 
 export async function authorizeEnhancedSchoolRoute(user,path,method){
- if(method==='GET'||user.role==='student'||path.startsWith('/school/push-')||path.startsWith('/school/notification'))return;
- const permissions=await permissionsFor(user);
- const rules=[[/^\/school\/homework/, 'homework'],[/^\/school\/grades/, 'grades'],[/^\/school\/records/, 'records'],[/^\/school\/reports/, 'reports'],[/^\/school\/(chat-settings|chat-stats)/,'chat_moderation']];
+ if(path.startsWith('/school/push-')||path.startsWith('/school/notification'))return;
+ const permissions=user.permissions||await permissionsFor(user);
+ const rules=[[/^\/school\/homework(?:-submissions)?/, 'homework'],[/^\/school\/(grades|grade-summary)/, 'grades'],[/^\/school\/records/, 'records'],[/^\/school\/reports/, 'reports'],[/^\/school\/(points|point-log)/,'points'],[/^\/school\/subjects/,'subjects'],[/^\/school\/(chat-settings|chat-stats|admin-rooms|moderation)/,'chat_moderation']];
  const hit=rules.find(([pattern])=>pattern.test(path));
- if(hit&&!permissions[hit[1]])fail(403,'此帳號沒有執行這項功能的權限');
+ if(!hit)return;
+ if(method==='GET'&&['subjects','points'].includes(hit[1]))return;
+ if(method==='GET'&&path==='/school/chat-settings')return;
+ if(user.role==='student'&&method==='GET'&&['homework','grades','records'].includes(hit[1])&&!permissions[hit[1]])return;
+ if(user.role==='student'&&['POST','DELETE'].includes(method)&&hit[1]==='grades'&&!permissions.grades)return;
+ if(user.role==='student'&&method==='PATCH'&&/^\/school\/homework\/[0-9a-f-]{36}\/check$/i.test(path)&&!permissions.homework)return;
+ if(user.role==='student'&&method==='POST'&&path==='/school/reports'&&!permissions.reports)return;
+ if(user.role==='student'&&path.startsWith('/school/homework-submissions/')&&method==='PUT'&&!permissions.homework)return;
+ if(!permissions[hit[1]])fail(403,'此帳號沒有執行這項功能的權限');
 }
 
-function visibleAudience(user){return user.role==='student'?['學生','全部人員','全校學生','七年級','八年級','九年級']:null;}
+function visibleAudience(user){return user.role==='student'&&!user.permissions?.publish?['學生','全部人員','全校學生','七年級','八年級','九年級']:null;}
 async function visibleAnnouncement(id,user){
  if(!uuid(id))fail(400,'公告格式錯誤');
  const row=(await db.query('select * from announcements704 where id=$1',[id])).rows[0];
@@ -122,15 +130,22 @@ export async function enhancementRoutes({path,query,method,user,tokenHash,readBo
   if(method==='PUT'){const body=await readBody();if(!Array.isArray(body.favorites)||body.favorites.length>8||body.favorites.some(x=>typeof x!=='string'||x.length>40))fail(400,'常用功能格式錯誤');await db.query('insert into account_preferences704(account_id,favorites) values($1,$2) on conflict(account_id) do update set favorites=$2,updated_at=now()',[user.id,[...new Set(body.favorites)]]);send(200,{favorites:[...new Set(body.favorites)]});return true;}
  }
  if(path==='/school/search'&&method==='GET'){
-  const q=(query.get('q')||'').trim();if(q.length<2||q.length>100)fail(400,'請輸入至少兩個字搜尋');const like='%'+q+'%',results=[];
+  const q=(query.get('q')||'').trim();if(q.length<2||q.length>100)fail(400,'請輸入至少兩個字搜尋');const like='%'+q+'%',results=[],permissions=user.permissions||await permissionsFor(user),studentHomework=user.role==='student'&&!permissions.homework,studentGrades=user.role==='student'&&!permissions.grades;
   const audiences=visibleAudience(user);
   const announcements=(await db.query(`select id,title,left(regexp_replace(content,'<[^>]+>','','g'),180) excerpt,date from announcements704 where (title ilike $1 or content ilike $1) ${audiences?'and audience=any($2) and workflow_status=\'published\' and coalesce(publish_at,date)<=now() and (expires_at is null or expires_at>now())':''} order by date desc limit 20`,audiences?[like,audiences]:[like])).rows;
   results.push(...announcements.map(x=>({type:'announcement',title:x.title,excerpt:x.excerpt,date:x.date,target:x.id})));
-  const hw=(await db.query(`select h.id,h.title,h.due_on,s.name subject from school_homework h join school_subjects s on s.id=h.subject_id where (h.title ilike $1 or h.instructions ilike $1) ${user.role==='student'?'and (h.recipients is null or $2=any(h.recipients))':''} order by h.due_on desc limit 20`,user.role==='student'?[like,user.id]:[like])).rows;
+  const hw=(await db.query(`select h.id,h.title,h.due_on,s.name subject from school_homework h join school_subjects s on s.id=h.subject_id where (h.title ilike $1 or h.instructions ilike $1) ${studentHomework?'and (h.recipients is null or $2=any(h.recipients))':''} order by h.due_on desc limit 20`,studentHomework?[like,user.id]:[like])).rows;
   results.push(...hw.map(x=>({type:'homework',title:x.title,excerpt:x.subject,date:x.due_on,target:'homework'})));
-  const grades=(await db.query(`select g.id,g.title,g.grade_day,s.name subject,a.display_name student from school_grades g join school_subjects s on s.id=g.subject_id join accounts704 a on a.id=g.student_id where (g.title ilike $1 or s.name ilike $1 or a.display_name ilike $1) ${user.role==='student'?'and g.student_id=$2 and g.visible':''} order by g.grade_day desc limit 20`,user.role==='student'?[like,user.id]:[like])).rows;
-  results.push(...grades.map(x=>({type:'grade',title:x.title,excerpt:user.role==='student'?x.subject:`${x.student} · ${x.subject}`,date:x.grade_day,target:'grades'})));
-  if(user.role==='admin'){const accounts=(await db.query('select id,display_name,email from accounts704 where display_name ilike $1 or email ilike $1 order by display_name limit 20',[like])).rows;results.push(...accounts.map(x=>({type:'account',title:x.display_name,excerpt:x.email,target:'accounts'})));}
+  const grades=(await db.query(`select g.id,g.title,g.grade_day,s.name subject,a.display_name student from school_grades g join school_subjects s on s.id=g.subject_id join accounts704 a on a.id=g.student_id where (g.title ilike $1 or s.name ilike $1 or a.display_name ilike $1) ${studentGrades?'and g.student_id=$2 and g.visible':''} order by g.grade_day desc limit 20`,studentGrades?[like,user.id]:[like])).rows;
+  results.push(...grades.map(x=>({type:'grade',title:x.title,excerpt:studentGrades?x.subject:`${x.student} · ${x.subject}`,date:x.grade_day,target:'grades'})));
+  const ownRecords=user.role==='student'&&!permissions.records;
+  const records=(await db.query(`select r.id,r.title,r.content,r.record_day,a.display_name student from school_records r join accounts704 a on a.id=r.student_id where (r.title ilike $1 or r.content ilike $1 or a.display_name ilike $1) ${ownRecords?'and r.student_id=$2':''} order by r.record_day desc limit 20`,ownRecords?[like,user.id]:[like])).rows;
+  results.push(...records.map(x=>({type:'record',title:x.title,excerpt:ownRecords?x.content:`${x.student} · ${x.content}`,date:x.record_day,target:'records'})));
+  const reports=permissions.reports?(await db.query("select r.id,r.reason,r.created_at,coalesce(a.display_name,'其他檢舉') target_name from school_reports r left join accounts704 a on a.id=r.target_id where r.reason ilike $1 or a.display_name ilike $1 order by r.created_at desc limit 20",[like])).rows:user.role==='student'?(await db.query("select r.id,r.reason,r.created_at,coalesce(a.display_name,'其他檢舉') target_name from school_reports r left join accounts704 a on a.id=r.target_id where r.reporter_id=$2 and (r.reason ilike $1 or a.display_name ilike $1) order by r.created_at desc limit 20",[like,user.id])).rows:[];
+  results.push(...reports.map(x=>({type:'report',title:x.reason,excerpt:x.target_name,date:x.created_at,target:permissions.reports?'reports':'report-center'})));
+  const messages=(await db.query(`select m.id,m.content,m.created_at,r.name room from school_messages m join school_rooms r on r.id=m.room_id where not m.deleted and m.content ilike $1 and (${permissions.chat_moderation?'true':'exists(select 1 from school_members sm where sm.room_id=m.room_id and sm.account_id=$2)'}) order by m.created_at desc limit 20`,permissions.chat_moderation?[like]:[like,user.id])).rows;
+  results.push(...messages.map(x=>({type:'message',title:x.room,excerpt:x.content,date:x.created_at,target:permissions.chat_moderation?'adminchat':'chat'})));
+  if(permissions.accounts){const accounts=(await db.query('select id,display_name,email from accounts704 where display_name ilike $1 or email ilike $1 order by display_name limit 20',[like])).rows;results.push(...accounts.map(x=>({type:'account',title:x.display_name,excerpt:x.email,target:'accounts'})));}
   send(200,results.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,50));return true;
  }
  if((match=path.match(/^\/school\/announcement-workflow\/([0-9a-f-]{36})$/i))){
@@ -144,11 +159,11 @@ export async function enhancementRoutes({path,query,method,user,tokenHash,readBo
  }
  if((match=path.match(/^\/school\/homework-submissions\/([0-9a-f-]{36})$/i))){
   const homework=(await db.query('select * from school_homework where id=$1',[match[1]])).rows[0];if(!homework)fail(404,'找不到作業');
-  if(method==='GET'){if(user.role==='student'){if(homework.recipients&&!homework.recipients.includes(user.id))fail(403,'這不是你的作業');send(200,(await db.query('select * from school_homework_submissions where homework_id=$1 and student_id=$2',[homework.id,user.id])).rows[0]||null);return true;}if(!staff(user))fail(403,'無法查看繳交狀態');const rows=(await db.query("select a.id,a.display_name,a.nickname,s.status,s.note,s.link,s.submitted_at,s.reviewed_at from accounts704 a left join school_homework_submissions s on s.student_id=a.id and s.homework_id=$1 where a.role='student' and not a.disabled and ($2::uuid[] is null or a.id=any($2)) order by s.submitted_at nulls first,a.display_name",[homework.id,homework.recipients])).rows;send(200,rows);return true;}
+   if(method==='GET'){if(user.role==='student'&&!user.permissions?.homework){if(homework.recipients&&!homework.recipients.includes(user.id))fail(403,'這不是你的作業');send(200,(await db.query('select * from school_homework_submissions where homework_id=$1 and student_id=$2',[homework.id,user.id])).rows[0]||null);return true;}if(!user.permissions?.homework)fail(403,'無法查看繳交狀態');const rows=(await db.query("select a.id,a.display_name,a.nickname,s.status,s.note,s.link,s.submitted_at,s.reviewed_at from accounts704 a left join school_homework_submissions s on s.student_id=a.id and s.homework_id=$1 where a.role='student' and not a.disabled and ($2::uuid[] is null or a.id=any($2)) order by s.submitted_at nulls first,a.display_name",[homework.id,homework.recipients])).rows;send(200,rows);return true;}
   if(method==='PUT'){if(user.role!=='student')fail(403,'僅學生可繳交作業');if(homework.recipients&&!homework.recipients.includes(user.id))fail(403,'這不是你的作業');const body=await readBody(),note=text(body.note||'',3000,false),link=text(body.link||'',1000,false);if(link&&!/^https:\/\//i.test(link))fail(400,'請輸入 HTTPS 連結');const row=(await db.query("insert into school_homework_submissions(homework_id,student_id,status,note,link) values($1,$2,'submitted',$3,$4) on conflict(homework_id,student_id) do update set status='submitted',note=$3,link=$4,submitted_at=now() returning *",[homework.id,user.id,note,link])).rows[0];send(200,row);return true;}
  }
  if(path==='/school/grade-summary'&&method==='GET'){
-  const rows=(await db.query(`select g.student_id,a.display_name,s.id subject_id,s.name subject,round(sum((g.score/nullif(g.max_score,0))*100*g.weight)/nullif(sum(g.weight),0),2) average,count(*)::int items from school_grades g join accounts704 a on a.id=g.student_id join school_subjects s on s.id=g.subject_id where g.max_score>0 ${user.role==='student'?'and g.student_id=$1 and g.visible':''} group by g.student_id,a.display_name,s.id,s.name order by a.display_name,s.name`,user.role==='student'?[user.id]:[])).rows;send(200,rows);return true;
+  const own=user.role==='student'&&!user.permissions?.grades,rows=(await db.query(`select g.student_id,a.display_name,s.id subject_id,s.name subject,round(sum((g.score/nullif(g.max_score,0))*100*g.weight)/nullif(sum(g.weight),0),2) average,count(*)::int items from school_grades g join accounts704 a on a.id=g.student_id join school_subjects s on s.id=g.subject_id where g.max_score>0 ${own?'and g.student_id=$1 and g.visible':''} group by g.student_id,a.display_name,s.id,s.name order by a.display_name,s.name`,own?[user.id]:[])).rows;send(200,rows);return true;
  }
  if(path==='/school/digest-settings'){
   if(method==='GET'){const row=(await db.query('select digest_frequency from school_notification_settings where account_id=$1',[user.id])).rows[0];send(200,{frequency:row?.digest_frequency||'immediate'});return true;}

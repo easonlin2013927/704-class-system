@@ -15,7 +15,7 @@ export async function migrateMailEvents(){await db.query(`
   with due as (
    insert into school_chat_mail_throttle(account_id,last_queued_at)
    select a.id,now() from school_members m join accounts704 a on a.id=m.account_id left join school_presence p on p.account_id=a.id
-   where m.room_id=new.room_id and a.id is distinct from new.author_id and not a.disabled and (p.last_seen is null or p.last_seen<now()-interval '2 minutes')
+   where m.room_id=new.room_id and a.id is distinct from new.author_id and not a.disabled and coalesce((select chat from school_notification_settings s where s.account_id=a.id),true) and (p.last_seen is null or p.last_seen<now()-interval '2 minutes')
    on conflict(account_id) do update set last_queued_at=excluded.last_queued_at where school_chat_mail_throttle.last_queued_at<now()-interval '30 minutes'
    returning account_id
   ) insert into school_mail_queue(id,account_id,kind,title) select gen_random_uuid(),account_id,'offline-chat','你有新的聊天訊息' from due where coalesce((select external_enabled from school_notification_gate where id=1),true);
@@ -57,7 +57,7 @@ export async function scheduleDigests(){
     try{
      const run=await client.query('insert into school_mail_digest_runs(account_id,frequency,period_key) values($1,$2,$3) on conflict do nothing returning account_id',[account.id,frequency,periodKey]);
      if(run.rowCount){
-      const items=(await client.query("select kind,title,created_at from school_notifications where account_id=$1 and kind<>'points' and created_at>=now()-($2::text||' hours')::interval order by created_at desc limit 40",[account.id,hours])).rows;
+      const items=(await client.query("select kind,title,created_at from school_notifications where account_id=$1 and external_allowed and kind<>'points' and created_at>=now()-($2::text||' hours')::interval order by created_at desc limit 40",[account.id,hours])).rows;
       if(items.length)await client.query("insert into school_mail_queue(id,account_id,kind,title,event_kind) values(gen_random_uuid(),$1,'digest',$2,'digest')",[account.id,JSON.stringify({frequency,period:periodKey,items})]);
      }
      await client.query('commit');

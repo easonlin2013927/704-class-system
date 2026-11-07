@@ -29,7 +29,7 @@ function validAvatar(value){
 async function visibleAnnouncement(client,id,user,lock=""){
  const row=(await client.query("select * from announcements704 where id=$1"+lock,[id])).rows[0];
  if(!row)fail(404,"找不到公告");
- if(user.role==="student"&&(!["學生","全部人員","全校學生","七年級","八年級","九年級"].includes(row.audience)||row.workflow_status!=="published"||(row.publish_at&&new Date(row.publish_at)>new Date())||(row.expires_at&&new Date(row.expires_at)<=new Date())))fail(404,"找不到公告");return row;
+ if(user.role==="student"&&!user.permissions?.publish&&(!["學生","全部人員","全校學生","七年級","八年級","九年級"].includes(row.audience)||row.workflow_status!=="published"||(row.publish_at&&new Date(row.publish_at)>new Date())||(row.expires_at&&new Date(row.expires_at)<=new Date())))fail(404,"找不到公告");return row;
 }
 async function body(req) {
  let data = ""; for await (const chunk of req) { data += chunk; if (Buffer.byteLength(data) > 262144) throw Object.assign(new Error("內容過長"),{status:413}); }
@@ -104,6 +104,7 @@ const server = createServer(async (req,res) => {
  const token = req.headers.authorization?.replace(/^Bearer /,"") || "";
  const user = (await db.query("select a.id,a.role,a.display_name,a.must_change_password,a.must_add_email,a.must_change_email from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now() and not a.disabled",[digest(token)])).rows[0];
  if (!user) fail(401,"登入已失效，請重新登入");
+ user.permissions=await permissionsFor(user);
  await db.query('update sessions704 set last_seen=now(),user_agent=case when user_agent=\'\' then $2 else user_agent end where token_hash=$1',[digest(token),String(req.headers['user-agent']||'').slice(0,500)]);
  if (path === "/logout" && req.method === "POST") { await db.query("delete from sessions704 where token_hash=$1",[digest(token)]); return send(200,{ok:true}); }
  if(path === "/account/password" && req.method === "POST"){
@@ -131,7 +132,7 @@ const server = createServer(async (req,res) => {
  if((user.must_add_email||user.must_change_email)&&!/^\/school\/(mailboxes(?:\/[0-9a-f-]{36})?|mailbox-request|mailbox-confirm)$/.test(path)&&!(user.role==='admin'&&path==='/school/mail-admin/'+user.id))fail(403,'請先完成管理員要求的電子郵件設定','EMAIL_CHANGE_REQUIRED');
  if(path==='/school/mail-address'&&req.method==='GET')return send(200,await mailAddress(user));
  if(path==='/school/presence'&&req.method==='POST')return send(200,await markPresence(user));
- if(path==='/school/mail-status'&&req.method==='GET')return send(200,await mailStatus(user));
+  if(path==='/school/mail-status'&&req.method==='GET'){if(!user.permissions.site_settings)fail(403,'此帳號沒有網站設定權限');return send(200,await mailStatus({...user,role:'admin'}));}
  if(path==='/school/mail-address'&&req.method==='POST'){const b=await body(req);return send(202,await requestMailVerification(user,b.address));}
  if(path==='/school/mail-verify'&&req.method==='POST'){const b=await body(req);return send(200,await confirmMailVerification(user,b.code));}
  if(path==='/school/mailboxes'&&req.method==='GET')return send(200,await listMailboxes(user));
@@ -142,16 +143,21 @@ const server = createServer(async (req,res) => {
  if(path==='/school/mailbox-request'&&req.method==='POST'){const b=await body(req);const box=(await listMailboxes(user)).find(x=>x.id===b.id);if(!box)fail(404,'找不到信箱');return send(202,await requestMailVerification(user,box.address));}
  if(path==='/school/mailbox-confirm'&&req.method==='POST'){const b=await body(req);return send(200,await confirmMailbox(user,b.code));}
  const adminMailboxMatch=path.match(/^\/school\/mail-admin\/([0-9a-f-]{36})$/i);
- if(adminMailboxMatch&&req.method==='GET')return send(200,await listMailboxes(user,adminMailboxMatch[1]));
+  if(adminMailboxMatch&&req.method==='GET'){if(!user.permissions.accounts)fail(403,'此帳號沒有帳號管理權限');return send(200,await listMailboxes({...user,role:'admin'},adminMailboxMatch[1]));}
  if(adminMailboxMatch&&req.method==='POST'){if(user.role!=='admin')fail(403,'僅限管理員');const b=await body(req);return send(201,await createMailbox(user,b.address,adminMailboxMatch[1]));}
- if(path==='/school/mail-tests'&&req.method==='POST')return send(202,await createMailTest(user));
- if(path==='/school/mail-test-latest'&&req.method==='GET')return send(200,await latestMailTest(user));
+  if(path==='/school/mail-tests'&&req.method==='POST'){if(!user.permissions.site_settings)fail(403,'此帳號沒有網站設定權限');return send(202,await createMailTest({...user,role:'admin'}));}
+  if(path==='/school/mail-test-latest'&&req.method==='GET'){if(!user.permissions.site_settings)fail(403,'此帳號沒有網站設定權限');return send(200,await latestMailTest({...user,role:'admin'}));}
  const mailTestMatch=path.match(/^\/school\/mail-tests\/([0-9a-f-]{36})$/i);
- if(mailTestMatch&&req.method==='GET')return send(200,await getMailTest(user,mailTestMatch[1]));
- if(path==='/school/broadcasts'&&req.method==='POST'){if(!(await permissionsFor(user)).broadcast)fail(403,'此帳號沒有發送全員通知的權限');const b=await body(req);return send(202,await createBroadcast(user,b.message));}
- if(path==='/school/broadcast-latest'&&req.method==='GET')return send(200,await getBroadcast(user,'latest'));
+  if(mailTestMatch&&req.method==='GET'){if(!user.permissions.site_settings)fail(403,'此帳號沒有網站設定權限');return send(200,await getMailTest({...user,role:'admin'},mailTestMatch[1]));}
+  if(path==='/school/broadcasts'&&req.method==='POST'){
+   if(!user.permissions.broadcast)fail(403,'此帳號沒有發送全員通知的權限');const b=await body(req),job=await createBroadcast({...user,role:'admin'},b.message);
+   await db.query("insert into school_notifications(account_id,kind,title,external_allowed) select a.id,'broadcast',$1,false from accounts704 a cross join school_notification_gate g where g.id=1 and g.external_enabled and not a.disabled",[b.message.trim()]);
+   await db.query("update broadcast_targets t set status='disabled',reason='使用者已關閉全員通知',subscription=null,updated_at=now() where t.job_id=$1 and exists(select 1 from school_notification_settings s where s.account_id=t.account_id and not s.broadcast)",[job.id]);
+   return send(202,job);
+  }
+  if(path==='/school/broadcast-latest'&&req.method==='GET'){if(!user.permissions.broadcast)fail(403,'此帳號沒有全員通知權限');return send(200,await getBroadcast({...user,role:'admin'},'latest'));}
  const broadcastMatch=path.match(/^\/school\/broadcasts\/(latest|[0-9a-f-]{36})$/i);
- if(broadcastMatch&&req.method==='GET')return send(200,await getBroadcast(user,broadcastMatch[1]));
+  if(broadcastMatch&&req.method==='GET'){if(!user.permissions.broadcast)fail(403,'此帳號沒有全員通知權限');return send(200,await getBroadcast({...user,role:'admin'},broadcastMatch[1]));}
  if(path==="/school/wallpaper"&&req.method==="PUT"){
  const value=await body(req),image=value.wallpaper_url;
  if(typeof image!=="string"||image.length>210000||!(image===''||/^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/.test(image)))fail(400,"桌布格式錯誤或檔案過大");
@@ -169,7 +175,7 @@ const server = createServer(async (req,res) => {
  return send(200,profile((await db.query("update accounts704 set nickname=$1,theme=$2,avatar_url=$3 where id=$4 returning *",[value.nickname.trim(),value.theme,value.avatar_url,user.id])).rows[0]));
  }
  if (path === "/settings/banner" && ["GET","PUT"].includes(req.method)) {
- if (!["teacher","admin"].includes(user.role)) fail(403,"僅限教師或維護人員設定標語");
+ if (!(user.role==='teacher'||user.permissions.site_settings)) fail(403,"此帳號沒有網站設定權限");
  if(req.method==="GET") return send(200,(await db.query("select enabled,content from login_banner704 where id=1")).rows[0]);
  const value=await body(req);
  if(typeof value.enabled!=="boolean" || typeof value.content!=="string" || value.content.length>20000) fail(400,"標語格式錯誤或超過 20000 字元");
@@ -177,7 +183,7 @@ const server = createServer(async (req,res) => {
  return send(200,result.rows[0]);
  }
  if (path === "/settings/marquee" && ["GET","PUT"].includes(req.method)) {
- if (user.role !== "admin") fail(403,"僅限管理員設定跑馬公告");
+ if (!user.permissions.site_settings) fail(403,"此帳號沒有網站設定權限");
  if(req.method==="GET") return send(200,(await db.query("select enabled,content from site_marquee704 where id=1")).rows[0]);
  const value=await body(req);
  if(typeof value.enabled!=="boolean" || typeof value.content!=="string" || value.content.length>1000) fail(400,"跑馬公告格式錯誤或超過 1000 字元");
@@ -185,13 +191,12 @@ const server = createServer(async (req,res) => {
  return send(200,result.rows[0]);
  }
  if (path === "/admin/accounts" && ["GET","POST"].includes(req.method)) {
- if(!["admin","teacher"].includes(user.role)) fail(403,"僅限教師或管理員管理帳號");
- if(!(await permissionsFor(user)).accounts)fail(403,'此帳號沒有管理帳號的權限');
- if(req.method==="GET") return send(200,(await db.query(["teacher","assistant"].includes(user.role) ? "select id,email,display_name,role,disabled,must_change_password,must_add_email,must_change_email from accounts704 where role='student' order by display_name" : "select id,email,display_name,role,disabled,must_change_password,must_add_email,must_change_email from accounts704 order by role,display_name")).rows);
+ if(!user.permissions.accounts)fail(403,'此帳號沒有管理帳號的權限');
+ if(req.method==="GET") return send(200,(await db.query(user.role!=="admin" ? "select id,email,display_name,role,disabled,must_change_password,must_add_email,must_change_email from accounts704 where role='student' order by display_name" : "select id,email,display_name,role,disabled,must_change_password,must_add_email,must_change_email from accounts704 order by role,display_name")).rows);
  const value=await body(req);
  const email=typeof value.email==="string"?value.email.trim().toLowerCase():"";
  const name=typeof value.name==="string"&&value.name.trim()?value.name.trim():email;
- if(["teacher","assistant"].includes(user.role) && value.role!=="student") fail(403,"教師只能建立學生帳號");
+ if(user.role!=="admin" && value.role!=="student") fail(403,"非管理員只能建立學生帳號");
  if(value.must_change_email==='default'&&(user.role!=='admin'||value.role!=='student'||!/^[A-Za-z0-9._-]+$/.test(email)))fail(400,'此帳號沒有可自動建立的預設信箱，請先建立帳號後選擇信箱');
  if(!email || !["student","teacher","assistant","admin"].includes(value.role) || typeof value.password!=="string" || (value.disabled!==undefined&&typeof value.disabled!=="boolean") || (value.must_change_password!==undefined&&typeof value.must_change_password!=="boolean")) fail(400,"帳號欄位格式錯誤");
  const result=await db.query("insert into accounts704(id,email,display_name,role,password_hash,disabled,must_change_password) values($1,$2,$3,$4,$5,$6,$7) on conflict(email) do nothing returning id,email,display_name,role,disabled,must_change_password",[randomUUID(),email,name,value.role,await hash(value.password),value.disabled??false,value.must_change_password??false]);
@@ -202,8 +207,7 @@ const server = createServer(async (req,res) => {
  }
  const accountMatch=path.match(/^\/admin\/accounts\/([0-9a-f-]{36})$/i);
  if(accountMatch && ["PATCH","DELETE"].includes(req.method)) {
- if(!["admin","teacher"].includes(user.role) || (req.method==="DELETE"&&user.role!=="admin")) fail(403,"沒有管理此帳號的權限");
- if(!(await permissionsFor(user)).accounts)fail(403,'此帳號沒有管理帳號的權限');
+ if(!user.permissions.accounts || (req.method==="DELETE"&&user.role!=="admin")) fail(403,"沒有管理此帳號的權限");
  const value=req.method==="PATCH"?await body(req):{};
  const client=await db.connect();
  try{
@@ -211,7 +215,7 @@ const server = createServer(async (req,res) => {
  await client.query("lock table accounts704 in share row exclusive mode");
  const target=(await client.query("select * from accounts704 where id=$1",[accountMatch[1]])).rows[0];
  if(!target) fail(404,"找不到帳號");
- if(["teacher","assistant"].includes(user.role) && (target.role!=="student" || (value.role!==undefined&&value.role!=="student"))) fail(403,"教師只能編輯學生帳號");
+ if(user.role!=="admin" && (target.role!=="student" || (value.role!==undefined&&value.role!=="student"))) fail(403,"非管理員只能編輯學生帳號");
  if(req.method==="DELETE"){
  if(target.id===user.id) fail(400,"不能刪除目前登入的帳號");
  if(target.role==="admin"&&!target.disabled&&Number((await client.query("select count(*)::int as total from accounts704 where role='admin' and not disabled")).rows[0].total)<=1) fail(400,"至少需保留一位啟用中的管理員");
@@ -235,7 +239,7 @@ const server = createServer(async (req,res) => {
  }catch(error){await client.query("rollback");if(error.code==="23505") fail(409,"此帳號已存在");throw error;}finally{client.release();}
  }
  if (path === "/admin/status" && req.method === "GET") {
- if (user.role !== "admin") fail(403,"僅限維護人員");
+ if (!user.permissions.site_settings) fail(403,"此帳號沒有網站設定權限");
  const result = await db.query("select count(*)::int as total from announcements704");
  const counts=(await db.query("select (select count(*)::int from accounts704) as accounts,(select count(*)::int from countdowns704) as activities")).rows[0];
  return send(200,{status:"ok",announcements:result.rows[0].total,...counts,host:hostname(),platform:platform()+" / "+arch(),cpu:`${cpus()[0]?.model || 'CPU'} / ${cpus().length} 核心`,memory:`${Math.round((totalmem()-freemem())/1048576)} / ${Math.round(totalmem()/1048576)} MB`,uptime:`${Math.floor(uptime()/86400)} 天 ${Math.floor(uptime()%86400/3600)} 小時`,checked_at:new Date().toISOString()});
@@ -243,7 +247,7 @@ const server = createServer(async (req,res) => {
  if(path === "/countdowns" && req.method === "GET") return send(200,(await db.query("select * from countdowns704 order by target_at")).rows);
  const countdownMatch=path.match(/^\/countdowns\/([0-9a-f-]{36})$/i);
  if(path === "/countdowns" || countdownMatch){
- if(!["teacher","assistant","admin"].includes(user.role)) fail(403,"僅限教師或管理員管理倒數活動");
+ if(!user.permissions.publish) fail(403,"此帳號沒有管理倒數活動的權限");
  if((path === "/countdowns" && req.method === "POST") || (countdownMatch && req.method === "PATCH")){
  const b=await body(req); const date=new Date(b.target_at);
  const end=b.ends_at?new Date(b.ends_at):null;
@@ -276,10 +280,9 @@ const server = createServer(async (req,res) => {
  }
  if(path==="/announcements"&&req.method==="GET"){
  const query="select n.*,coalesce(a.display_name,n.author) as author,a.nickname as author_nickname,a.avatar_url as author_avatar from announcements704 n left join accounts704 a on a.id=n.author_id";
- return send(200,(await db.query(query+(user.role==="student"?" where n.audience in ('學生','全部人員','全校學生','七年級','八年級','九年級') and n.workflow_status='published' and coalesce(n.publish_at,n.date)<=now() and (n.expires_at is null or n.expires_at>now())":"")+" order by n.pinned desc,n.date desc")).rows);
+ return send(200,(await db.query(query+(user.role==="student"&&!user.permissions.publish?" where n.audience in ('學生','全部人員','全校學生','七年級','八年級','九年級') and n.workflow_status='published' and coalesce(n.publish_at,n.date)<=now() and (n.expires_at is null or n.expires_at>now())":"")+" order by n.pinned desc,n.date desc")).rows);
  }
- if(!["teacher","assistant","admin"].includes(user.role))fail(403,"僅限教師或管理員管理公告");
- if(!(await permissionsFor(user)).publish)fail(403,'此帳號沒有發布公告的權限');
+ if(!user.permissions.publish)fail(403,'此帳號沒有發布公告的權限');
  const match=path.match(/^\/announcements\/([0-9a-f-]{36})$/i);
  if((path==="/announcements"&&req.method==="POST")||(match&&req.method==="PATCH")){
  const b=await body(req);
