@@ -1,4 +1,4 @@
-import { config } from "./config.js?v=0.26.0";
+import { config } from "./config.js?v=0.26.1";
 let token = null;
 async function request(path, options = {}) {
   if (!config.url) throw new Error("系統尚未設定雲端服務，請聯絡管理員。");
