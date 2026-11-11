@@ -20,9 +20,11 @@
 
 | 身分 | 登入網址 |
 | --- | --- |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-class-system/?app=student#/student/login) |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-class-system/?app=teacher#/teacher/login) |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-class-system/#/admin/login) |
+| 學生 | [學生登入／安裝 PWA](https://easonlin2013927.github.io/704-class-system/student/) |
+| 教師與小老師 | [教師端登入／安裝 PWA](https://easonlin2013927.github.io/704-class-system/teacher/) |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-class-system/admin/) |
+
+這三個是永久入口，網址不含版本號，系統更新後也不需要更換書籤或重新取得連結。
 
 請使用符合帳號角色的入口。三個畫面獨立，切換網址不會取得不同角色權限。
 

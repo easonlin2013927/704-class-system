@@ -1,6 +1,6 @@
 # 作業、提醒與聊天（學生）
 
-[學生登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/student/login)
+[學生永久登入／安裝入口](https://easonlin2013927.github.io/704-class-system/student/)
 
 登入後可由上方功能列選擇「公告」「作業簿」「我的提醒」「聊天」。首頁「我的提醒」會摘要顯示未勾選作業、待補交項目及最近的評語。資料保存於雲端；換裝置登入仍保留。
 

@@ -1,4 +1,4 @@
-const APP_VERSION = '0.27.0';
+const APP_VERSION = '0.27.1';
 const CACHE_NAME = `704-class-system-${APP_VERSION}`;
 const APP_SHELL = [
   './',

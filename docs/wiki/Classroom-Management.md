@@ -1,6 +1,6 @@
 # 作業與個別學生紀錄（教師／管理員）
 
-[教師／小老師入口](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/teacher/login) · [管理員入口](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/admin/login)
+[教師／小老師永久入口](https://easonlin2013927.github.io/704-class-system/teacher/) · [管理員永久入口](https://easonlin2013927.github.io/704-class-system/admin/)
 
 ## 科目管理
 

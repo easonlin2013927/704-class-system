@@ -1,5 +1,5 @@
-import {cloud} from './cloud.js?v=0.27.0';
-import {exportMailTest} from './broadcast.js?v=0.27.0';
+import {cloud} from './cloud.js?v=0.27.1';
+import {exportMailTest} from './broadcast.js?v=0.27.1';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const role={student:'學生',teacher:'教師',assistant:'小老師',admin:'管理員'};
 function status(x){return x.status==='sent'?'寄件服務已接受':x.disabled?'帳號停用':!x.address?'沒有信箱':!x.verified?'等待驗證':x.last_error?'失敗，排隊重試':'處理中';}

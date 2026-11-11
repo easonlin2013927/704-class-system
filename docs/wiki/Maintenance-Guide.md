@@ -6,7 +6,7 @@
 
 「設定」分為個人化、網站設定；個人化可選 7 種風格、上傳頭像、設定暱稱，網站設定保留狀態表、標語與跑馬公告。管理員可切換任一公告的評論區並刪除評論。詳見[個人化設定](Personalization.md)。
 
-[前往維護人員登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/admin/login)
+[前往維護人員永久入口](https://easonlin2013927.github.io/704-class-system/admin/)
 
 請使用維護人員獨立入口，輸入 role 為 admin 的帳號。教師或學生帳號不能登入此入口。
 

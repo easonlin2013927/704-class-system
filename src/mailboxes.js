@@ -1,4 +1,4 @@
-import {cloud} from './cloud.js?v=0.27.0';
+import {cloud} from './cloud.js?v=0.27.1';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function mountMailboxes(host,accountId=null,onVerified=null,forcedId=null){
  const admin=Boolean(accountId);host.innerHTML=`<h2>電子郵件地址</h2><p>預設信箱由管理員管理；自行新增的信箱需驗證後才能接收通知。</p><div data-mail-list>載入中…</div><button type="button" class="secondary-button" data-mail-add>新增電子郵件</button><dialog class="form-dialog" data-mail-dialog><section class="editor-card"><h2 data-mail-title>新增電子郵件</h2><div data-mail-enter><label>電子郵件地址<input type="email" maxlength="254" data-mail-input></label><button type="button" class="primary-button" data-mail-send>${admin?'儲存':'寄送驗證碼'}</button></div><div data-mail-verify hidden><p>請查看信箱並輸入 6 位數驗證碼，驗證碼有效 5 分鐘。</p><label>驗證碼<input data-mail-code inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label><button type="button" class="primary-button" data-mail-confirm>確認驗證</button></div><button type="button" class="secondary-button" data-mail-close>關閉</button><p role="status" data-mail-status></p></section></dialog>`;
