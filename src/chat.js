@@ -1,4 +1,4 @@
-import { cloud } from './cloud.js?v=0.26.1';
+import { cloud } from './cloud.js?v=0.27.0';
 
 const api=(path,method='GET',value)=>cloud.school(path,method,value);
 const esc=(value='')=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));

@@ -1,5 +1,11 @@
 # 704公告系統使用中心
 
+## 離線畫面（v0.27.0）
+
+系統偵測到裝置沒有網際網路時，會自動顯示「目前沒有網際網路」畫面，並暫停原頁面的操作。系統會持續檢查連線；重新連上 Wi-Fi、行動網路或有線網路後，會自動回到斷線前的畫面，不需要重新登入。
+
+離線期間不能閱讀尚未載入的資料，也不能新增、修改或送出內容。系統不會將公告或使用者資料改存到瀏覽器。
+
 ## 班級生活功能（v0.14.0）
 
 - [學生操作手冊](Student-Life.md)：作業勾選、私人提醒與聊天，僅包含學生操作。
@@ -14,9 +20,9 @@
 
 | 身分 | 登入網址 |
 | --- | --- |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/student/login) |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/teacher/login) |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/admin/login) |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-class-system/?app=student#/student/login) |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-class-system/?app=teacher#/teacher/login) |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-class-system/#/admin/login) |
 
 請使用符合帳號角色的入口。三個畫面獨立，切換網址不會取得不同角色權限。
 

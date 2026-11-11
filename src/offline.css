@@ -1,0 +1,105 @@
+.offline-screen[hidden] { display: none; }
+
+.offline-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 24px;
+  overflow: auto;
+  color: #172634;
+  background: linear-gradient(rgba(31, 70, 100, .055) 1px, transparent 1px), #eef1ed;
+  background-size: 100% 28px;
+}
+
+.is-offline { overflow: hidden; }
+
+.is-offline #app,
+.is-offline .toast-region,
+.is-offline #operation-progress { visibility: hidden; }
+
+.offline-card {
+  width: min(100%, 580px);
+  padding: clamp(30px, 7vw, 64px);
+  border: 2px solid #172634;
+  border-radius: 4px;
+  background: #fffdf7;
+  box-shadow: 12px 12px 0 rgba(23, 38, 52, .16);
+}
+
+.offline-logo {
+  display: block;
+  width: 88px;
+  height: 88px;
+  margin-bottom: 32px;
+}
+
+.offline-eyebrow {
+  margin: 0 0 12px;
+  color: #50718a;
+  font: 700 .78rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: .18em;
+}
+
+.offline-card h1 {
+  margin: 0 0 18px;
+  font-size: clamp(2rem, 7vw, 3.5rem);
+  line-height: 1.08;
+}
+
+.offline-card > p:not(.offline-eyebrow) {
+  margin: 0;
+  color: #45535d;
+  font-size: 1.05rem;
+  line-height: 1.8;
+}
+
+.offline-status {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 30px 0 18px;
+  padding: 14px 16px;
+  border-left: 4px solid #c46c57;
+  background: #f4eee7;
+}
+
+.offline-status span {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #c46c57;
+  box-shadow: 0 0 0 4px rgba(196, 108, 87, .14);
+}
+
+#offline-retry {
+  min-height: 48px;
+  padding: 11px 18px;
+  border: 1px solid #172634;
+  border-radius: 3px;
+  color: #fffdf7;
+  background: #234f70;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#offline-retry:hover { background: #173b55; }
+#offline-retry:focus-visible { outline: 3px solid #efc665; outline-offset: 3px; }
+#offline-retry:disabled { cursor: wait; opacity: .65; }
+
+@media (max-width: 480px) {
+  .offline-screen { padding: 16px; }
+  .offline-card { padding: 28px 24px 32px; box-shadow: 7px 7px 0 rgba(23, 38, 52, .16); }
+  .offline-logo { width: 68px; height: 68px; margin-bottom: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offline-screen *, .offline-screen *::before, .offline-screen *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
