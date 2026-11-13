@@ -1,3 +1,13 @@
+# v0.27.2
+
+新增 10 張「704班級系統」角色介紹簡報，以 Liquid Glass 視覺語言呈現學生、教師與小老師的使用方式，內容排除維護人員。簡報包含學生公告、作業、聊天與安全，教師公告編輯、課務流程與學生追蹤，以及小老師的功能與權限邊界。
+
+簡報採 16:9 版面、Noto Sans TC 字型、可編輯文字與 UI 元件，並為每張投影片加入淡入轉場。GitHub Pages 提供固定下載網址：`/704-class-system/downloads/704-class-system-role-guide.pptx`。
+
+本版只有文件與簡報資產變更，API、資料庫與 Cloudflare Worker 不需更新。
+
+---
+
 # v0.27.1
 
 新增不隨版本改變的永久入口：`/student/`、`/teacher/` 與 `/admin/`。學生與教師／小老師可永久使用同一個網址進入 PWA 安裝頁，管理員也有固定登入網址。README 與所有 Wiki 手冊已移除舊版 `?v=` 入口，PWA manifest 與 Service Worker 註冊網址也不再附加版本參數。

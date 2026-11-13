@@ -5,6 +5,7 @@ dist/
 *.log
 .taste-skill/
 shots/
+.deck-build/
 .env
 .env.*
 !.env.example

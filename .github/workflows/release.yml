@@ -1,4 +1,4 @@
-name: Publish v0.27.1 release
+name: Publish v0.27.2 release
 on:
   push:
     branches: [main]
@@ -20,6 +20,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.27.1 >/dev/null 2>&1; then
-            gh release create v0.27.1 --target "$GITHUB_SHA" --title "v0.27.1 永久 PWA 安裝入口" --notes-file deploy/RELEASE.md
+          if ! gh release view v0.27.2 >/dev/null 2>&1; then
+            gh release create v0.27.2 --target "$GITHUB_SHA" --title "v0.27.2 Liquid Glass 系統介紹簡報" --notes-file deploy/RELEASE.md docs/presentations/704-class-system-role-guide.pptx
           fi

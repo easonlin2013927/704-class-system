@@ -1,5 +1,11 @@
 # 704班級系統
 
+## 系統介紹簡報
+
+- [下載 Liquid Glass 角色介紹簡報（PPTX）](https://easonlin2013927.github.io/704-class-system/downloads/704-class-system-role-guide.pptx)
+- 內容依學生、教師與小老師分類介紹，排除維護人員，並使用固定 PWA 入口。
+- 簡報採用 HTML5／CSS 風格的 Liquid Glass 視覺語言，PowerPoint 內使用可編輯元件與淡入轉場呈現。
+
 ## v0.27.1 永久入口（網址不隨版本變更）
 
 - 學生 PWA 安裝：[https://easonlin2013927.github.io/704-class-system/student/](https://easonlin2013927.github.io/704-class-system/student/)
