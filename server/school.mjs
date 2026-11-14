@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { db } from './db.mjs';
-import {createBackup,deleteBackup,downloadBackup,healthCenter,listBackups} from './system-center.mjs';
+import {createBackup,deleteBackup,healthCenter,listBackups,streamBackup} from './system-center.mjs';
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
 const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const text=(value,max=2000)=>{if(typeof value!=='string'||!value.trim()||value.trim().length>max)fail(400,`請填寫內容（最多 ${max} 字）`);return value.trim();};
@@ -87,7 +87,7 @@ export async function migrateSchool(){await db.query(`
  create trigger school_notify_grade after insert on school_grades for each row execute function school_notify_event();
  create index if not exists school_records_student on school_records(student_id,record_day);
  `);}
-export async function schoolRoutes({path,query,method,user,readBody,send}){
+export async function schoolRoutes({path,query,method,user,readBody,send,res}){
  const tail=path.slice('/school/'.length).split('/');const [resource,id,action]=tail;
  if(resource==='health-center'){
   requireRole(user.role==='admin'&&can(user,'site_settings'));
@@ -97,7 +97,7 @@ export async function schoolRoutes({path,query,method,user,readBody,send}){
   requireRole(user.role==='admin'&&can(user,'site_settings'));
   if(method==='GET'&&!id)return send(200,await listBackups());
   if(method==='POST'&&!id)return send(201,await createBackup(user));
-  if(method==='GET'&&uuid(id)&&action==='download')return send(200,await downloadBackup(id));
+  if(method==='GET'&&uuid(id)&&action==='download')return streamBackup(id,res);
   if(method==='DELETE'&&uuid(id))return send(200,await deleteBackup(id));
  }
  if(resource==='today'&&method==='GET'){

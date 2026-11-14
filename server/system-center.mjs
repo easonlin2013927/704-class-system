@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rm, statfs, writeFile } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { mkdir, rm, stat, statfs, writeFile } from 'node:fs/promises';
+import { pipeline } from 'node:stream/promises';
 import { gzip } from 'node:zlib';
 import { promisify } from 'node:util';
 import { arch, cpus, freemem, hostname, platform, totalmem, uptime } from 'node:os';
@@ -56,5 +58,19 @@ export async function createBackup(user){
 }
 
 export async function listBackups(){return (await db.query('select id,file_name,size_bytes,table_count,row_count,status,error,created_at,completed_at from system_backups704 order by created_at desc limit 50')).rows;}
-export async function downloadBackup(id){if(!uuid(id))fail(400,'備份格式錯誤');const row=(await db.query("select * from system_backups704 where id=$1 and status='ready'",[id])).rows[0];if(!row)fail(404,'找不到可下載的備份');const bytes=await readFile(join(backupDir,row.file_name));return {file_name:row.file_name,data:bytes.toString('base64')};}
+export async function streamBackup(id,res){
+ if(!uuid(id))fail(400,'備份格式錯誤');
+ const row=(await db.query("select file_name from system_backups704 where id=$1 and status='ready'",[id])).rows[0];
+ if(!row)fail(404,'找不到可下載的備份');
+ const path=join(backupDir,row.file_name),info=await stat(path).catch(()=>null);
+ if(!info?.isFile())fail(404,'備份檔案不存在，請重新建立備份');
+ res.writeHead(200,{
+  'Content-Type':'application/gzip',
+  'Content-Length':String(info.size),
+  'Content-Disposition':`attachment; filename="${row.file_name}"`,
+  'Cache-Control':'no-store',
+  'X-Content-Type-Options':'nosniff'
+ });
+ await pipeline(createReadStream(path),res);
+}
 export async function deleteBackup(id){if(!uuid(id))fail(400,'備份格式錯誤');const row=(await db.query('delete from system_backups704 where id=$1 returning file_name',[id])).rows[0];if(!row)fail(404,'找不到備份');await rm(join(backupDir,row.file_name),{force:true});return {ok:true};}

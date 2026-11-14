@@ -1,4 +1,4 @@
-name: Publish v0.28.0 release
+name: Publish v0.28.1 release
 on:
   push:
     branches: [main]
@@ -20,6 +20,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.28.0 >/dev/null 2>&1; then
-            gh release create v0.28.0 --target "$GITHUB_SHA" --title "v0.28.0 今天、批量動作與系統備份中心" --notes-file deploy/RELEASE.md docs/presentations/704-class-system-role-guide.pptx
+          if ! gh release view v0.28.1 >/dev/null 2>&1; then
+            gh release create v0.28.1 --target "$GITHUB_SHA" --title "v0.28.1 備份下載修正" --notes-file deploy/RELEASE.md docs/presentations/704-class-system-role-guide.pptx
           fi

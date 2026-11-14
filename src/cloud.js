@@ -28,6 +28,17 @@ async function request(path, options = {}) {
 export const cloud = {
   presence(){return request('/school/presence',{method:'POST',silent:true});},
   school(path,method='GET',value){return request('/school/'+path,{method,...(value===undefined?{}:{body:JSON.stringify(value)})});},
+  async downloadBackup(id){
+    window.dispatchEvent(new Event('operation-start'));
+    try{
+      const response=await fetch(config.url.replace(/\/$/,'')+'/school/backups/'+encodeURIComponent(id)+'/download',{credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{})},cache:'no-store'});
+      if(!response.ok){const result=await response.json().catch(()=>({}));throw new Error(result.message||'備份下載失敗');}
+      const blob=await response.blob(),disposition=response.headers.get('Content-Disposition')||'',match=disposition.match(/filename="([^"]+)"/),url=URL.createObjectURL(blob),anchor=document.createElement('a');
+      anchor.href=url;anchor.download=match?.[1]||'704-backup.json.gz';document.body.append(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:true}}));
+    }catch(error){window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:false,message:error.message}}));throw error;}
+    finally{window.dispatchEvent(new Event('operation-end'));}
+  },
   attachments(post){return request('/school/attachments?post='+encodeURIComponent(post));},
   async uploadAttachment(post,file,onProgress=()=>{}){if(file.size>400*1024*1024)throw new Error('單一公告附件不能超過 400 MB');const entry=await request('/school/attachments',{method:'POST',body:JSON.stringify({announcement_id:post,name:file.name,type:file.type||'application/octet-stream',size:file.size})});try{const chunkSize=4*1024*1024;for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){const part=file.slice(offset,Math.min(file.size,offset+chunkSize)),complete=offset+part.size>=file.size;const response=await fetch(config.url.replace(/\/$/,'')+'/school/attachments/'+entry.id+'?complete='+complete,{method:'PATCH',credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/octet-stream'},body:part});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||'公告附件上傳失敗');onProgress(file.size?Math.min(100,Math.round((offset+part.size)/file.size*100)):100);}}catch(e){await request('/school/attachments/'+entry.id,{method:'DELETE'}).catch(()=>{});throw e;}},
   downloadAttachment(id){const anchor=document.createElement('a');anchor.href=config.url.replace(/\/$/,'')+'/school/attachments/'+encodeURIComponent(id);anchor.rel='noopener';document.body.append(anchor);anchor.click();anchor.remove();},

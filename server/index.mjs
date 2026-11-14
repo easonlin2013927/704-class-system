@@ -169,7 +169,7 @@ const server = createServer(async (req,res) => {
  const query=new URL(req.url,'http://localhost').searchParams;
  if(await enhancementRoutes({path,query,method:req.method,user,tokenHash:digest(token),readBody:()=>body(req),send,req,res}))return;
  await authorizeEnhancedSchoolRoute(user,path,req.method);
- return await schoolRoutes({path,query,method:req.method,user,readBody:()=>body(req),send});
+ return await schoolRoutes({path,query,method:req.method,user,readBody:()=>body(req),send,res});
  }
  if(path==="/me"&&req.method==="PATCH"){
  const value=await body(req);
@@ -316,7 +316,8 @@ const server = createServer(async (req,res) => {
  fail(404,"找不到此功能");
  } catch(error) {
  if (!error.status) console.error("API/database operation failed");
- send(error.status || 503,{message:error.status ? error.message : "服務暫時無法使用，請稍後再試",...(error.code==="PASSWORD_CHANGE_REQUIRED"?{code:error.code}:{})});
+ if(res.headersSent)res.destroy(error);
+ else send(error.status || 503,{message:error.status ? error.message : "服務暫時無法使用，請稍後再試",...(error.code==="PASSWORD_CHANGE_REQUIRED"?{code:error.code}:{})});
  }
 });
 server.requestTimeout=30000;
