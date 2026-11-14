@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { db } from './db.mjs';
+import {createBackup,deleteBackup,downloadBackup,healthCenter,listBackups} from './system-center.mjs';
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
 const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const text=(value,max=2000)=>{if(typeof value!=='string'||!value.trim()||value.trim().length>max)fail(400,`請填寫內容（最多 ${max} 字）`);return value.trim();};
@@ -88,6 +89,28 @@ export async function migrateSchool(){await db.query(`
  `);}
 export async function schoolRoutes({path,query,method,user,readBody,send}){
  const tail=path.slice('/school/'.length).split('/');const [resource,id,action]=tail;
+ if(resource==='health-center'){
+  requireRole(user.role==='admin'&&can(user,'site_settings'));
+  if(method==='GET')return send(200,await healthCenter());
+ }
+ if(resource==='backups'){
+  requireRole(user.role==='admin'&&can(user,'site_settings'));
+  if(method==='GET'&&!id)return send(200,await listBackups());
+  if(method==='POST'&&!id)return send(201,await createBackup(user));
+  if(method==='GET'&&uuid(id)&&action==='download')return send(200,await downloadBackup(id));
+  if(method==='DELETE'&&uuid(id))return send(200,await deleteBackup(id));
+ }
+ if(resource==='today'&&method==='GET'){
+  const d="(now() at time zone 'Asia/Taipei')::date",own=studentMode(user,'homework'),studentAudience=user.role==='student'&&!can(user,'publish');
+  const [announcements,activities,homework,records,notices]=await Promise.all([
+   db.query(`select id,title,category,publish_at,created_at from announcements704 where workflow_status='published' and (coalesce(publish_at,created_at) at time zone 'Asia/Taipei')::date=${d} ${studentAudience?"and audience in ('學生','全部人員','全校學生','七年級','八年級','九年級')":''} order by coalesce(publish_at,created_at) desc limit 12`),
+   db.query(`select id,title,target_at,ends_at from countdowns704 where (target_at at time zone 'Asia/Taipei')::date<=${d} and (coalesce(ends_at,target_at) at time zone 'Asia/Taipei')::date>=${d} order by target_at limit 12`),
+   db.query(`select h.id,h.title,h.work_day,h.due_on,s.name subject,coalesce(c.done,false) done from school_homework h join school_subjects s on s.id=h.subject_id left join school_checks c on c.homework_id=h.id and c.student_id=$1 where (h.work_day=${d} or h.due_on between ${d} and ${d}+3) ${own?'and (h.recipients is null or $1=any(h.recipients))':''} order by h.due_on,h.created_at limit 30`,[user.id]),
+   (can(user,'records')||user.role==='student')?db.query(`select r.id,r.kind,r.title,r.record_day,r.due_on,r.resolved,a.display_name student from school_records r join accounts704 a on a.id=r.student_id where (r.record_day=${d} or (r.kind='missing' and not r.resolved)) ${studentMode(user,'records')?'and r.student_id=$1':''} order by r.record_day desc limit 30`,[user.id]):Promise.resolve({rows:[]}),
+   db.query('select count(*)::int unread from school_notifications where account_id=$1 and read_at is null',[user.id])
+  ]);
+  return send(200,{date:new Date().toISOString(),announcements:announcements.rows,activities:activities.rows,homework:homework.rows,records:records.rows,unread:notices.rows[0].unread});
+ }
  if(resource==='notification-gate'){
   requireRole(can(user,'site_settings'));
   if(method==='GET')return send(200,(await db.query('select external_enabled,updated_at from school_notification_gate where id=1')).rows[0]);
@@ -124,11 +147,30 @@ export async function schoolRoutes({path,query,method,user,readBody,send}){
   if(method==='GET')return send(200,(await db.query("select a.id,a.display_name,a.nickname,coalesce(sum(p.amount),0)::integer as points from accounts704 a left join school_points p on p.student_id=a.id where a.role='student' and not a.disabled group by a.id order by points desc,a.display_name")).rows);
   requireRole(can(user,'points'));if(method==='POST'){const b=await readBody(),selected=await students(Array.isArray(b.students)?b.students:[b.student_id]);if(!Number.isInteger(b.amount)||b.amount===0||Math.abs(b.amount)>10000||typeof (b.reason??'')!=='string'||(b.reason??'').length>500)fail(400,'請選擇學生並輸入有效分數');return send(201,await transaction(async c=>{const rows=[];for(const student of selected)rows.push((await c.query('insert into school_points(id,student_id,author_id,amount,reason) values($1,$2,$3,$4,$5) returning *',[randomUUID(),student,user.id,b.amount,(b.reason??'').trim()])).rows[0]);return rows;}));}
  }
+ if(resource==='homework-bulk'&&method==='PATCH'){
+  requireRole(can(user,'homework'));const b=await readBody(),ids=Array.isArray(b.ids)?[...new Set(b.ids)]:[];if(!ids.length||ids.some(x=>!uuid(x)))fail(400,'請選擇作業');
+  if(b.action==='delete'){const r=await db.query('delete from school_homework where id=any($1::uuid[]) returning id',[ids]);return send(200,{updated:r.rowCount});}
+  if(b.action==='due'){const due=date(b.due_on),invalid=await db.query('select 1 from school_homework where id=any($1::uuid[]) and work_day>$2 limit 1',[ids,due]);if(invalid.rowCount)fail(400,'截止日期不能早於其中一項作業的登錄日期');const r=await db.query('update school_homework set due_on=$2 where id=any($1::uuid[]) returning id',[ids,due]);return send(200,{updated:r.rowCount});}
+  fail(400,'不支援此批次動作');
+ }
+ if(resource==='records-bulk'&&method==='PATCH'){
+  requireRole(can(user,'records'));const b=await readBody(),ids=Array.isArray(b.ids)?[...new Set(b.ids)]:[];if(!ids.length||ids.some(x=>!uuid(x)))fail(400,'請選擇學生紀錄');
+  if(b.action==='delete'){const r=await db.query('delete from school_records where id=any($1::uuid[]) returning id',[ids]);return send(200,{updated:r.rowCount});}
+  if(['resolve','reopen'].includes(b.action)){const r=await db.query("update school_records set resolved=$2 where id=any($1::uuid[]) and kind='missing' returning id",[ids,b.action==='resolve']);return send(200,{updated:r.rowCount});}
+  fail(400,'不支援此批次動作');
+ }
+ if(resource==='grades-bulk'&&method==='PATCH'){
+  requireRole(can(user,'grades'));const b=await readBody(),ids=Array.isArray(b.ids)?[...new Set(b.ids)]:[];if(!ids.length||ids.some(x=>!uuid(x)))fail(400,'請選擇成績');
+  if(b.action==='delete'){const r=await db.query('delete from school_grades where id=any($1::uuid[]) returning id',[ids]);return send(200,{updated:r.rowCount});}
+  if(['show','hide'].includes(b.action)){const r=await db.query('update school_grades set visible=$2 where id=any($1::uuid[]) returning id',[ids,b.action==='show']);return send(200,{updated:r.rowCount});}
+  fail(400,'不支援此批次動作');
+ }
  if(resource==='point-log'&&method==='GET'){requireRole(can(user,'points'));return send(200,(await db.query('select p.*,a.display_name as student,t.display_name as author from school_points p join accounts704 a on a.id=p.student_id left join accounts704 t on t.id=p.author_id order by p.created_at desc limit 500')).rows);}
  if(resource==='chat-stats'){
   requireRole(can(user,'chat_moderation'));
   if(method==='GET')return send(200,(await db.query("select a.id,a.display_name,a.nickname,a.chat_muted,count(m.id)::integer as count from accounts704 a left join school_messages m on m.author_id=a.id and m.created_at >= date_trunc('month',now() at time zone 'Asia/Taipei') at time zone 'Asia/Taipei' where a.role='student' and not a.disabled group by a.id order by count desc,a.display_name")).rows);
   if(method==='PATCH'&&uuid(id)){const b=await readBody();if(typeof b.muted!=='boolean')fail(400,'設定格式錯誤');const r=await db.query("update accounts704 set chat_muted=$1 where id=$2 and role='student' returning id,chat_muted",[b.muted,id]);if(!r.rowCount)fail(404,'找不到學生');return send(200,r.rows[0]);}
+  if(method==='PATCH'&&id==='bulk'){const b=await readBody(),ids=await students(b.students);if(typeof b.muted!=='boolean')fail(400,'設定格式錯誤');const r=await db.query("update accounts704 set chat_muted=$1 where id=any($2::uuid[]) and role='student' returning id",[b.muted,ids]);return send(200,{updated:r.rowCount});}
  }
  if(resource==='grades'){
   requireRole(can(user,'grades')||user.role==='student');

@@ -1,4 +1,4 @@
-name: Publish v0.27.2 release
+name: Publish v0.28.0 release
 on:
   push:
     branches: [main]
@@ -15,11 +15,11 @@ jobs:
         with:
           node-version: 22
       - run: node --test server/password.test.mjs deploy/worker/proxy.test.mjs
-      - run: node --check server/index.mjs && node --check server/account.mjs && node --check server/school.mjs && node --check server/enhancements.mjs && node --check server/mail-events.mjs && node --check src/school.js && npm run check && npm run build
+      - run: node --check server/index.mjs && node --check server/account.mjs && node --check server/school.mjs && node --check server/system-center.mjs && node --check server/enhancements.mjs && node --check server/mail-events.mjs && node --check src/school.js && npm run check && npm run build
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.27.2 >/dev/null 2>&1; then
-            gh release create v0.27.2 --target "$GITHUB_SHA" --title "v0.27.2 Liquid Glass 系統介紹簡報" --notes-file deploy/RELEASE.md docs/presentations/704-class-system-role-guide.pptx
+          if ! gh release view v0.28.0 >/dev/null 2>&1; then
+            gh release create v0.28.0 --target "$GITHUB_SHA" --title "v0.28.0 今天、批量動作與系統備份中心" --notes-file deploy/RELEASE.md docs/presentations/704-class-system-role-guide.pptx
           fi

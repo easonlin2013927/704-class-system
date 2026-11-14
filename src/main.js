@@ -1,11 +1,11 @@
-import { cloud } from "./cloud.js?v=0.27.1";
-import { initConnectivityGuard } from "./connectivity.js?v=0.27.1";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.27.1';
-import {mountMailboxes} from './mailboxes.js?v=0.27.1';
-import {mountMailTest} from './mail-test.js?v=0.27.1';
-import { portals, portalRole } from "./portal.js?v=0.27.1";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.27.1";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.27.1';
+import { cloud } from "./cloud.js?v=0.28.0";
+import { initConnectivityGuard } from "./connectivity.js?v=0.28.0";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.28.0';
+import {mountMailboxes} from './mailboxes.js?v=0.28.0';
+import {mountMailTest} from './mail-test.js?v=0.28.0';
+import { portals, portalRole } from "./portal.js?v=0.28.0";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.28.0";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.28.0';
 
 initConnectivityGuard();
 
@@ -200,6 +200,7 @@ function render() {
   if(state.session.must_add_email||state.session.must_change_email){state.settingsOpen=true;state.settingsTab='account';return renderStudentAccount();}
   if (state.settingsOpen) return renderSettings();
   if (state.adminView === "accounts" && state.session.permissions?.accounts) return renderAccounts();
+  if (state.adminView === "health" && state.session.role==='admin'&&state.session.permissions?.site_settings) return renderHealthCenter();
   if (state.schoolView !== 'home') return renderSchool();
   if (state.editingId !== null) return renderEditor();
   if (state.selectedId) return renderDetail();
@@ -272,6 +273,7 @@ function headerTemplate() {
         <span class="role-chip">${portals[state.session.role].label}端</span>
         <div class="user-block">${avatarMarkup(state.session.name,state.session.avatar_url)}<span><strong title="${escapeHtml(identityName(state.session.name,state.session.nickname))}">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>${state.session.role === "admin" ? "系統管理" : isTeacher ? "公告管理" : "704"}</small></span></div>
 ${state.session.permissions?.accounts ? `<button class="secondary-button" id="open-accounts">${state.session.role==='admin'?"帳號管理":"學生帳號"}</button>` : ""}
+${state.session.role==='admin'&&state.session.permissions?.site_settings?'<button class="secondary-button" id="open-health">健康與備份</button>':''}
 <button class="secondary-button" id="open-settings">設定</button>
         <button class="icon-button" id="logout" title="登出" aria-label="登出">${icon("logout")}</button>
       </nav>
@@ -301,6 +303,15 @@ function renderMaintenance() {
   check();
 }
 
+function formatBytes(value){const n=Number(value||0);if(!n)return '0 B';const units=['B','KB','MB','GB','TB'],i=Math.min(Math.floor(Math.log(n)/Math.log(1024)),units.length-1);return `${(n/1024**i).toFixed(i?1:0)} ${units[i]}`;}
+function renderHealthCenter(){
+ app.innerHTML=`${headerTemplate()}<main id="main-content" class="editor-shell health-center" tabindex="-1"><button class="back-button" id="health-back">${icon('back',18)} 返回首頁</button><div class="editor-heading"><span class="eyebrow dark">SYSTEM OPERATIONS</span><h1>系統健康與備份中心</h1><p>維護人員可查看 API、資料庫、通知服務與 1.8 TB 資料碟狀態，並建立可下載的資料庫備份。</p></div><p id="health-message" role="status">正在檢查系統…</p><div id="health-summary" class="summary-grid"></div><section class="editor-card"><div class="school-heading"><div><h2>服務健康</h2><p class="muted">資料每次重新整理都會即時檢查。</p></div><button class="secondary-button" id="refresh-health">重新檢查</button></div><div class="table-scroll"><table class="status-table"><tbody id="health-rows"></tbody></table></div></section><section class="editor-card"><div class="school-heading"><div><h2>資料庫備份</h2><p class="muted">備份儲存在 1.8 TB 資料碟；請定期下載到另一台裝置，避免單一硬碟故障。</p></div><button class="primary-button" id="create-backup">立即建立備份</button></div><div class="table-scroll"><table class="status-table"><thead><tr><th>建立時間</th><th>狀態</th><th>內容</th><th>大小</th><th>操作</th></tr></thead><tbody id="backup-rows"></tbody></table></div></section></main>`;
+ bindHeader();document.querySelector('#health-back').onclick=goHome;const message=document.querySelector('#health-message'),summary=document.querySelector('#health-summary'),rows=document.querySelector('#health-rows'),backups=document.querySelector('#backup-rows');
+ const load=async()=>{try{const [h,list]=await Promise.all([cloud.school('health-center'),cloud.school('backups')]);summary.innerHTML=`<article class="summary-tile"><small>API</small><strong>正常</strong><span>已運作 ${Math.floor(h.api.uptime_seconds/3600)} 小時</span></article><article class="summary-tile"><small>資料庫</small><strong>${h.database.latency_ms} ms</strong><span>${formatBytes(h.database.size_bytes)}</span></article><article class="summary-tile"><small>資料碟可用空間</small><strong>${formatBytes(h.storage.free_bytes)}</strong><span>${escapeHtml(h.storage.path)}</span></article><article class="summary-tile"><small>外部通知</small><strong>${h.services.external_notifications?'開啟':'關閉'}</strong><span>Email ${h.services.email_configured?'已設定':'未設定'}</span></article>`;const info=[['檢查時間',formatDate(h.checked_at,true)],['執行主機',h.api.host],['平台',h.api.platform],['CPU',h.api.cpu],['記憶體',`${formatBytes(h.api.memory_used)} / ${formatBytes(h.api.memory_total)}`],['資料庫連線',`${h.database.connections.active} 使用中 / ${h.database.connections.total} 總計`],['帳號',h.counts.accounts],['公告',h.counts.announcements],['作業',h.counts.homework],['聊天訊息',h.counts.messages],['未讀系統通知',h.counts.unread_notifications]];rows.innerHTML=info.map(([k,v])=>`<tr><th>${escapeHtml(String(k))}</th><td>${escapeHtml(String(v))}</td></tr>`).join('');backups.innerHTML=list.map(x=>`<tr><td>${formatDate(x.created_at,true)}</td><td><span class="status-badge ${x.status==='failed'?'disabled':''}">${x.status==='ready'?'可下載':x.status==='creating'?'建立中':'失敗'}</span></td><td>${x.table_count} 個資料表、${x.row_count} 筆資料${x.error?`<small>${escapeHtml(x.error)}</small>`:''}</td><td>${formatBytes(x.size_bytes)}</td><td>${x.status==='ready'?`<button class="secondary-button" data-backup-download="${x.id}">下載</button>`:''}<button class="danger-button" data-backup-delete="${x.id}">刪除</button></td></tr>`).join('')||'<tr><td colspan="5">尚未建立備份。</td></tr>';message.textContent='';bindBackupActions();}catch(error){message.textContent=error.message;}};
+ const bindBackupActions=()=>{backups.querySelectorAll('[data-backup-download]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const file=await cloud.school(`backups/${b.dataset.backupDownload}/download`),bytes=Uint8Array.from(atob(file.data),c=>c.charCodeAt(0)),url=URL.createObjectURL(new Blob([bytes],{type:'application/gzip'})),a=document.createElement('a');a.href=url;a.download=file.file_name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(error){toast(error.message,'error');}finally{b.disabled=false;}});backups.querySelectorAll('[data-backup-delete]').forEach(b=>b.onclick=async()=>{if(!confirm('確定刪除此備份？刪除後無法復原。'))return;b.disabled=true;try{await cloud.school(`backups/${b.dataset.backupDelete}`,'DELETE');await load();}catch(error){toast(error.message,'error');b.disabled=false;}});};
+ document.querySelector('#refresh-health').onclick=load;document.querySelector('#create-backup').onclick=async event=>{event.currentTarget.disabled=true;message.textContent='正在建立並壓縮備份…';try{await cloud.school('backups','POST',{});toast('備份建立完成');await load();}catch(error){message.textContent=error.message;}finally{event.currentTarget.disabled=false;}};load();
+}
+
 function renderAccounts() {
  const isAdmin=state.session.role==="admin";
  app.innerHTML=`${headerTemplate()}<main id="main-content" class="editor-shell" tabindex="-1">
@@ -320,7 +331,7 @@ function renderAccounts() {
  <label class="check-option"><input name="disabled" type="checkbox">停用帳戶</label>
  <footer class="editor-footer"><span>編輯後，該帳號需重新登入。</span><button class="primary-button" id="save-person">建立帳號</button></footer>
  </form>${isAdmin?'<section id="permission-editor" class="editor-card" hidden><h2>功能權限</h2><p>可依帳號細分公告、作業、成績、紀錄、檢舉、帳號、全員通知與聊天管理權限。</p><div id="permission-fields" class="permission-grid"></div><p id="permission-message" role="status"></p></section><section id="admin-mailboxes" class="editor-card" hidden></section>':''}</dialog>
- <section class="editor-card"><h2>現有帳號</h2><label>篩選帳號<select id="account-filter"><option value="all">全部</option><option value="student">學生</option><option value="teacher">教師</option><option value="assistant">小老師</option><option value="admin">管理員</option><option value="disabled">已停用</option><option value="active">啟用中</option></select></label><p id="accounts-message" role="status">載入中…</p><div id="accounts-list"></div></section></main>`;
+ <section class="editor-card"><h2>現有帳號</h2><label>篩選帳號<select id="account-filter"><option value="all">全部</option><option value="student">學生</option><option value="teacher">教師</option><option value="assistant">小老師</option><option value="admin">管理員</option><option value="disabled">已停用</option><option value="active">啟用中</option></select></label><div class="bulk-selection account-bulk"><div class="selection-tools"><button type="button" class="secondary-button" data-account-pick="visible">全選目前結果</button><button type="button" class="secondary-button" data-account-pick="students">全班學生</button><button type="button" class="secondary-button" data-account-pick="none">清除</button><strong id="account-picked-count">已選 0 人</strong></div><div class="school-inline"><label>批量動作<select id="account-bulk-action"><option value="enable">啟用帳號</option><option value="disable">停用帳號</option><option value="require_password">要求更換密碼</option><option value="clear_password">取消更換密碼要求</option>${isAdmin?'<option value="require_email">要求新增 Email</option><option value="clear_email">取消新增 Email 要求</option>':''}</select></label><button type="button" class="primary-button" id="apply-account-bulk">套用至已選帳號</button></div></div><p id="accounts-message" role="status">載入中…</p><div id="accounts-list"></div></section></main>`;
  bindHeader();
  document.querySelector("#accounts-back").addEventListener("click",goHome);
  const dialog=document.querySelector("#person-dialog"),form=document.querySelector("#account-form"),message=document.querySelector("#accounts-message"),list=document.querySelector("#accounts-list");
@@ -342,10 +353,14 @@ function renderAccounts() {
  const refresh=async()=>{
  try{
  state.accounts=await cloud.accounts();
- list.innerHTML=state.accounts.filter(account=>{const filter=document.querySelector("#account-filter").value;return filter==="all"||(filter==="active"?!account.disabled:filter==="disabled"?account.disabled:account.role===filter);}).map(account=>`<div class="account-row"><div><strong>${escapeHtml(account.display_name)}</strong><small>${escapeHtml(account.email)}</small></div><div class="account-badges"><span class="role-chip">${portals[account.role].label}</span><span class="status-badge ${account.disabled?"disabled":""}">${account.disabled?"已停用":"啟用中"}</span>${account.must_change_password?'<span class="status-badge">需更換密碼</span>':""}</div><button class="secondary-button" data-edit-account="${account.id}">編輯</button>${isAdmin?`<button class="danger-button" data-remove-account="${account.id}">刪除</button>`:""}</div>`).join("")||"<p>尚無帳號。</p>";message.textContent="";
+ list.innerHTML=state.accounts.filter(account=>{const filter=document.querySelector("#account-filter").value;return filter==="all"||(filter==="active"?!account.disabled:filter==="disabled"?account.disabled:account.role===filter);}).map(account=>`<div class="account-row" data-account-role="${account.role}"><label class="row-selector" aria-label="選取 ${escapeHtml(account.display_name)}"><input type="checkbox" data-account-select value="${account.id}"></label><div><strong>${escapeHtml(account.display_name)}</strong><small>${escapeHtml(account.email)}</small></div><div class="account-badges"><span class="role-chip">${portals[account.role].label}</span><span class="status-badge ${account.disabled?"disabled":""}">${account.disabled?"已停用":"啟用中"}</span>${account.must_change_password?'<span class="status-badge">需更換密碼</span>':""}</div><button class="secondary-button" data-edit-account="${account.id}">編輯</button>${isAdmin?`<button class="danger-button" data-remove-account="${account.id}">刪除</button>`:""}</div>`).join("")||"<p>尚無帳號。</p>";message.textContent="";updateBulkCount();
  }catch(error){message.textContent=error.message;}
  };
  document.querySelector("#account-filter").addEventListener("change",refresh);
+ const updateBulkCount=()=>{const count=list.querySelectorAll('[data-account-select]:checked').length;document.querySelector('#account-picked-count').textContent=`已選 ${count} 人`;};
+ document.querySelectorAll('[data-account-pick]').forEach(button=>button.addEventListener('click',async()=>{const mode=button.dataset.accountPick;if(mode==='students'&&document.querySelector('#account-filter').value!=='student'){document.querySelector('#account-filter').value='student';await refresh();}list.querySelectorAll('[data-account-select]').forEach(input=>input.checked=mode==='visible'||(mode==='students'&&input.closest('[data-account-role]').dataset.accountRole==='student'));updateBulkCount();}));
+ list.addEventListener('change',event=>{if(event.target.matches('[data-account-select]'))updateBulkCount();});
+ document.querySelector('#apply-account-bulk').addEventListener('click',async event=>{const ids=[...list.querySelectorAll('[data-account-select]:checked')].map(x=>x.value);if(!ids.length){toast('請先選擇帳號','error');return;}const action=document.querySelector('#account-bulk-action').value;if(['disable'].includes(action)&&!confirm(`確定要對 ${ids.length} 個帳號套用此動作？`))return;event.currentTarget.disabled=true;try{const result=await cloud.bulkAccounts({ids,action});toast(`已更新 ${result.updated} 個帳號`);await refresh();}catch(error){toast(error.message,'error');}finally{event.currentTarget.disabled=false;}});
  form.addEventListener("submit",async event=>{
  event.preventDefault();const button=document.querySelector("#save-person"),data=Object.fromEntries(new FormData(form)),id=data.id;delete data.id;
  data.disabled=form.elements.disabled.checked;data.must_change_password=form.elements.must_change_password.checked;
@@ -375,6 +390,7 @@ function bindHeader() {
   document.querySelectorAll('[data-school-view]').forEach(b=>b.addEventListener('click',()=>navigateSchool(b.dataset.schoolView)));
   document.querySelector("#open-settings")?.addEventListener("click",()=>{state.schoolView='home';state.settingsOpen=true;state.settingsTab="personal";state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();});
   document.querySelector("#open-accounts")?.addEventListener("click",()=>{state.schoolView='home';state.settingsOpen=false;state.adminView="accounts";state.editingId=null;state.selectedId=null;render();});
+  document.querySelector('#open-health')?.addEventListener('click',()=>{state.schoolView='home';state.settingsOpen=false;state.adminView='health';state.editingId=null;state.selectedId=null;render();});
   document.querySelectorAll("[data-home]").forEach(button=>button.addEventListener("click",goHome));
   document.querySelector("#logout")?.addEventListener("click",()=>{cloud.logout();state.schoolView='home';state.session=null;state.settingsOpen=false;state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();refreshBanner();});
 }

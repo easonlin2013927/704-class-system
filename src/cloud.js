@@ -100,5 +100,6 @@ export const cloud = {
   accounts() { return request("/admin/accounts"); },
   createAccount(value) { return request("/admin/accounts", { method: "POST", body: JSON.stringify(value) }); },
   updateAccount(id, value) { return request("/admin/accounts/" + encodeURIComponent(id), { method: "PATCH", body: JSON.stringify(value) }); },
+  bulkAccounts(value) { return request("/admin/accounts/bulk", { method: "PATCH", body: JSON.stringify(value) }); },
   deleteAccount(id) { return request("/admin/accounts/" + encodeURIComponent(id), { method: "DELETE" }); },
 };

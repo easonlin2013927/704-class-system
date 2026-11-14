@@ -12,6 +12,7 @@ import {migrateMailDeliveries,processMultiMail} from './multi-mail-worker.mjs';
 import {createMailTest,getMailTest,latestMailTest} from './mail-tests.mjs';
 import {migrateMailEvents,markPresence,scheduleWeeklyRanking,scheduleDigests} from './mail-events.mjs';
 import {migrateEnhancements,enhancementRoutes,authorizeEnhancedSchoolRoute,publishScheduledAnnouncements,cleanupExpiredChatFiles,serveProfileFile,permissionsFor} from './enhancements.mjs';
+import {migrateSystemCenter} from './system-center.mjs';
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
@@ -44,6 +45,7 @@ await migrateMail();
 await migrateMailboxes();
 await migrateMailDeliveries();
 await migrateMailEvents();
+await migrateSystemCenter();
 const generatedPushKeys=webpush.generateVAPIDKeys();
 await db.query('insert into school_push_keys(id,public_key,private_key) values(1,$1,$2) on conflict(id) do nothing',[generatedPushKeys.publicKey,generatedPushKeys.privateKey]);
 const pushKeys=(await db.query('select public_key,private_key from school_push_keys where id=1')).rows[0];
@@ -204,6 +206,17 @@ const server = createServer(async (req,res) => {
  if(user.role==='admin'&&value.must_add_email===true)await db.query('update accounts704 set must_add_email=true,must_add_email_since=now() where id=$1',[result.rows[0].id]);
  if(user.role==='admin'&&value.must_change_email==='default')await db.query('update accounts704 set must_change_email=(select id from school_mailboxes where account_id=$1 and locked limit 1),must_change_email_original=(select address from school_mailboxes where account_id=$1 and locked limit 1) where id=$1',[result.rows[0].id]);
  return send(201,result.rows[0]);
+ }
+ if(path==='/admin/accounts/bulk'&&req.method==='PATCH'){
+  if(!user.permissions.accounts)fail(403,'此帳號沒有管理帳號的權限');
+  const value=await body(req),ids=Array.isArray(value.ids)?[...new Set(value.ids)]:[];
+  if(!ids.length||ids.some(id=>!/^[0-9a-f-]{36}$/i.test(id)))fail(400,'請選擇要批次處理的帳號');
+  const allowed=user.role==='admin'?['enable','disable','require_password','clear_password','require_email','clear_email']:['enable','disable','require_password','clear_password'];
+  if(!allowed.includes(value.action))fail(400,'不支援此批次動作');
+  const client=await db.connect();try{await client.query('begin');const rows=(await client.query('select id,role from accounts704 where id=any($1::uuid[]) for update',[ids])).rows;if(rows.length!==ids.length)fail(404,'部分帳號已不存在');if(user.role!=='admin'&&rows.some(x=>x.role!=='student'))fail(403,'教師只能批次管理學生');if(ids.includes(user.id)&&value.action==='disable')fail(400,'不能停用目前登入的帳號');
+   const sets={enable:'disabled=false',disable:'disabled=true',require_password:'must_change_password=true',clear_password:'must_change_password=false',require_email:'must_add_email=true,must_add_email_since=coalesce(must_add_email_since,now())',clear_email:'must_add_email=false,must_add_email_since=null'};
+   const result=await client.query(`update accounts704 set ${sets[value.action]} where id=any($1::uuid[]) returning id`,[ids]);await client.query('delete from sessions704 where account_id=any($1::uuid[])',[ids]);await client.query('commit');return send(200,{updated:result.rowCount});
+  }catch(error){await client.query('rollback');throw error;}finally{client.release();}
  }
  const accountMatch=path.match(/^\/admin\/accounts\/([0-9a-f-]{36})$/i);
  if(accountMatch && ["PATCH","DELETE"].includes(req.method)) {

@@ -6,13 +6,20 @@
 - 內容依學生、教師與小老師分類介紹，排除維護人員，並使用固定 PWA 入口。
 - 簡報採用 HTML5／CSS 風格的 Liquid Glass 視覺語言，PowerPoint 內使用可編輯元件與淡入轉場呈現。
 
-## v0.27.1 永久入口（網址不隨版本變更）
+## v0.28.0 永久入口（網址不隨版本變更）
 
 - 學生 PWA 安裝：[https://easonlin2013927.github.io/704-class-system/student/](https://easonlin2013927.github.io/704-class-system/student/)
 - 教師／小老師 PWA 安裝：[https://easonlin2013927.github.io/704-class-system/teacher/](https://easonlin2013927.github.io/704-class-system/teacher/)
 - 管理員登入：[https://easonlin2013927.github.io/704-class-system/admin/](https://easonlin2013927.github.io/704-class-system/admin/)
 
 以上網址不含版本號，未來發布新版仍使用相同入口。管理員入口是一般網頁，不強制安裝 PWA。
+
+## v0.28.0 今天、批量動作與系統備份
+
+- 導覽新增「今天」，依身分集中顯示今日公告、近期作業期限、進行中活動、學生提醒／班級紀錄與收件閘未讀數量。
+- 選擇學生時可按「全班」；帳號、作業、學生紀錄、成績與聊天發言權限亦可勾選多筆後套用批量動作。
+- 維護人員頁首新增「健康與備份」，可查看 API、PostgreSQL、通知、記憶體與 1.8 TB 資料碟狀態，並建立、下載或刪除壓縮資料庫備份。
+- 操作與備份注意事項見[管理員使用手冊](docs/wiki/Admin-Guide.md)與[維護人員使用說明](docs/wiki/Maintenance-Guide.md)。
 
 ## v0.27.0 離線保護與專案整理
 
