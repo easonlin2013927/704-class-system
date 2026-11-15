@@ -1,8 +1,11 @@
-const APP_VERSION = '0.28.1';
+const APP_VERSION = '0.28.2';
 const CACHE_NAME = `704-class-system-${APP_VERSION}`;
 const APP_SHELL = [
   './',
   './index.html',
+  './student/',
+  './teacher/',
+  './admin/',
   './src/styles.css',
   './src/themes.css',
   './src/school.css',
@@ -51,9 +54,24 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET') return;
 
   if (request.mode === 'navigate') {
+    const url = new URL(request.url);
+    const entryMatch = url.pathname.match(/\/(student|teacher|admin)\/?$/);
+    const entry = entryMatch ? `./${entryMatch[1]}/` : './index.html';
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const network = fetch(request, { cache: 'no-store', signal: controller.signal }).then(async response => {
+      if (response.ok) {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(entry, response.clone());
+      }
+      return response;
+    }).finally(() => clearTimeout(timeout));
+    event.waitUntil(network.then(() => undefined).catch(() => undefined));
     event.respondWith((async () => {
+      const cached = await caches.match(entry, { ignoreSearch: true });
+      if (cached) return cached;
       try {
-        return await fetch(request, { cache: 'no-store' });
+        return await network;
       } catch {
         return await caches.match('./index.html', { ignoreSearch: true });
       }

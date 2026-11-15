@@ -6,13 +6,21 @@
 - 內容依學生、教師與小老師分類介紹，排除維護人員，並使用固定 PWA 入口。
 - 簡報採用 HTML5／CSS 風格的 Liquid Glass 視覺語言，PowerPoint 內使用可編輯元件與淡入轉場呈現。
 
-## v0.28.1 永久入口（網址不隨版本變更）
+## v0.28.2 永久入口（網址不隨版本變更）
 
 - 學生 PWA 安裝：[https://easonlin2013927.github.io/704-class-system/student/](https://easonlin2013927.github.io/704-class-system/student/)
 - 教師／小老師 PWA 安裝：[https://easonlin2013927.github.io/704-class-system/teacher/](https://easonlin2013927.github.io/704-class-system/teacher/)
 - 管理員登入：[https://easonlin2013927.github.io/704-class-system/admin/](https://easonlin2013927.github.io/704-class-system/admin/)
 
 以上網址不含版本號，未來發布新版仍使用相同入口。管理員入口是一般網頁，不強制安裝 PWA。
+
+## v0.28.2 PWA 入口載入加速
+
+- 已快取學生、教師與管理員固定入口；再次進入時先顯示快取頁面，再於背景更新。
+- Service Worker 的網路導覽新增 5 秒逾時，避免網路不穩時長時間停在瀏覽器載入畫面。
+- 移除每次開啟頁面都強制更新 Service Worker 的行為，改在初始畫面顯示後於背景註冊。
+- 網路健康探測延後到初始畫面完成後，檢查間隔由 10 秒調整為 30 秒，降低入口載入時的競爭。
+- 首次下載程式期間會立即顯示啟動畫面，不再呈現空白頁。
 
 ## v0.28.1 備份下載修正
 

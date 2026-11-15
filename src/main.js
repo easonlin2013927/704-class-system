@@ -1,16 +1,22 @@
-import { cloud } from "./cloud.js?v=0.28.1";
-import { initConnectivityGuard } from "./connectivity.js?v=0.28.1";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.28.1';
-import {mountMailboxes} from './mailboxes.js?v=0.28.1';
-import {mountMailTest} from './mail-test.js?v=0.28.1';
-import { portals, portalRole } from "./portal.js?v=0.28.1";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.28.1";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.28.1';
+import { cloud } from "./cloud.js?v=0.28.2";
+import { initConnectivityGuard } from "./connectivity.js?v=0.28.2";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.28.2';
+import {mountMailboxes} from './mailboxes.js?v=0.28.2';
+import {mountMailTest} from './mail-test.js?v=0.28.2';
+import { portals, portalRole } from "./portal.js?v=0.28.2";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.28.2";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.28.2';
 
 initConnectivityGuard();
 
 let activeRole = portalRole(location.hash);
-function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});}
+function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';}
+function registerPwaInBackground(){
+  if(!('serviceWorker' in navigator))return;
+  const register=()=>navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).catch(()=>{});
+  if('requestIdleCallback' in window)requestIdleCallback(register,{timeout:2500});
+  else setTimeout(register,1200);
+}
 setupPwa(activeRole);
 const isPwaWindow=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 let installPrompt=null;
@@ -888,5 +894,6 @@ function mountBroadcast(){
 }
 
 render();
+registerPwaInBackground();
 refreshBanner();
 if(activeRole==='admin'||isPwaWindow())cloud.me().then(async profile=>{if((profile.role==='assistant'?'teacher':profile.role)!==activeRole)return;const [access,preferences]=await Promise.all([cloud.school('permissions').catch(()=>null),cloud.school('preferences').catch(()=>null)]);state.session={...profile,name:profile.display_name,permissions:access?.permissions||{},favorites:preferences?.favorites||[]};if(!profile.must_change_password&&!profile.must_add_email&&!profile.must_change_email){state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();const boxes=await cloud.school('mailboxes').catch(()=>null);if(boxes&&!boxes.some(x=>x.verified)){state.settingsOpen=true;state.settingsTab='account';}}render();}).catch(()=>{});

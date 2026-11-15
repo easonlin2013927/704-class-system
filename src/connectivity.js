@@ -1,5 +1,6 @@
-const CHECK_INTERVAL_MS = 10000;
-const CHECK_TIMEOUT_MS = 5000;
+const CHECK_INTERVAL_MS = 30000;
+const CHECK_TIMEOUT_MS = 4000;
+const INITIAL_CHECK_DELAY_MS = 1800;
 
 let checkSequence = 0;
 let checking = false;
@@ -94,6 +95,6 @@ export function initConnectivityGuard() {
   });
 
   if (!navigator.onLine) applyConnectivityState(false, screen);
-  else verify();
+  else setTimeout(verify, INITIAL_CHECK_DELAY_MS);
   setInterval(verify, CHECK_INTERVAL_MS);
 }
