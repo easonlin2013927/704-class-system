@@ -4,7 +4,11 @@ export const portals = {
   assistant: { label: "小老師" },
   admin: { label: "維護人員", title: "維護人員登入", description: "查看系統狀態，維護公告服務。", eyebrow: "維護人員入口" },
 };
-export function portalRole(hash) {
+export function portalRole(hash, pathname = location.pathname, search = location.search) {
   const match = hash.match(/^#\/(student|teacher|admin)\/login$/);
-  return match ? match[1] : "student";
+  if (match) return match[1];
+  const requested = new URLSearchParams(search).get("app");
+  if (["student", "teacher", "admin"].includes(requested)) return requested;
+  const pathMatch = pathname.match(/\/(student|teacher|admin)\/?$/);
+  return pathMatch?.[1] || "student";
 }

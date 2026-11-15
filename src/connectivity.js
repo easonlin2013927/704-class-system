@@ -56,7 +56,7 @@ async function probeConnection(screen) {
   button.disabled = true;
 
   try {
-    const checkUrl = new URL('./index.html', location.href);
+    const checkUrl = new URL('./index.html', document.baseURI);
     checkUrl.searchParams.set('connectivity', String(Date.now()));
     const response = await fetch(checkUrl, {
       method: 'HEAD',

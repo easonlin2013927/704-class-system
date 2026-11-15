@@ -1,10 +1,13 @@
 {
   "name": "campus-bulletin",
   "private": true,
-  "version": "0.28.2",
+  "version": "0.28.3",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "node --check src/main.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }
