@@ -1,4 +1,4 @@
-const APP_VERSION = '0.28.3';
+const APP_VERSION = '0.28.4';
 const CACHE_NAME = `704-class-system-${APP_VERSION}`;
 const APP_SHELL = [
   './',
@@ -6,8 +6,8 @@ const APP_SHELL = [
   './student/',
   './teacher/',
   './admin/',
-  './assets/app-0.28.3.css',
-  './assets/app-0.28.3.js',
+  './assets/app-0.28.4.css',
+  './assets/app-0.28.4.js',
   './src/logo.svg',
   './src/icon-192.png',
   './src/icon-512.png',

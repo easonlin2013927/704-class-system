@@ -48,7 +48,7 @@ const cssPath = `dist/assets/${assetBase}.css`;
 const bundledCss = await readFile(cssPath, "utf8");
 await writeFile(
   cssPath,
-  bundledCss.replace(/@import["']https:\/\/fonts\.googleapis\.com\/[^;]+;/g, ""),
+  bundledCss.replace(/@import\s*(?:url\()?['"]https:\/\/fonts\.googleapis\.com\/[^'"]+['"]\)?;/g, ""),
 );
 
 let html = await readFile("index.html", "utf8");

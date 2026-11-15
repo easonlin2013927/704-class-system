@@ -1,5 +1,5 @@
-import { cloud } from './cloud.js?v=0.28.3';
-import { renderChat } from './chat.js?v=0.28.3';
+import { cloud } from './cloud.js?v=0.28.4';
+import { renderChat } from './chat.js?v=0.28.4';
 let poll=null;
 export function disposeSchool(){if(poll)clearInterval(poll);poll=null;}
 const esc=(s='')=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
