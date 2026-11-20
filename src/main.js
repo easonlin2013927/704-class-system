@@ -1,11 +1,11 @@
-import { cloud } from "./cloud.js?v=0.29.0";
-import { initConnectivityGuard } from "./connectivity.js?v=0.29.0";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.29.0';
-import {mountMailboxes} from './mailboxes.js?v=0.29.0';
-import {mountMailTest} from './mail-test.js?v=0.29.0';
-import { portals, portalRole } from "./portal.js?v=0.29.0";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.29.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.29.0';
+import { cloud } from "./cloud.js?v=0.29.1";
+import { initConnectivityGuard } from "./connectivity.js?v=0.29.1";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.29.1';
+import {mountMailboxes} from './mailboxes.js?v=0.29.1';
+import {mountMailTest} from './mail-test.js?v=0.29.1';
+import { portals, portalRole } from "./portal.js?v=0.29.1";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.29.1";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.29.1';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 
 initConnectivityGuard();
@@ -783,7 +783,7 @@ function renderStudentAccount(){
  document.querySelector('#student-password').addEventListener('submit',async event=>{event.preventDefault();const f=event.currentTarget,d=new FormData(f),message=document.querySelector('#student-password-message'),button=f.querySelector('button');if(d.get('new_password')!==d.get('confirmation')){message.textContent='兩次輸入的新密碼不相同';return;}button.disabled=true;try{const profile=await cloud.changePassword({current_password:d.get('current_password'),new_password:d.get('new_password')});state.session={...state.session,...profile,name:profile.display_name};f.reset();message.textContent='密碼已更新';}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
 }
 function renderPersonalization(){
- let avatar=state.session.avatar_url||"",theme=state.themePreview?.theme||state.session.theme||"dark";
+ let avatar=state.session.avatar_url||"",theme="dark";
  app.innerHTML=`${headerTemplate()}<main class="editor-shell settings-shell">${settingsTabs()}<div class="editor-heading"><span class="eyebrow dark">PERSONALIZATION</span><h1>個人化</h1><p>選擇系統風格、設定頭像與暱稱，儲存後會跟隨帳號保留。</p></div><form id="profile-form" class="editor-card"><div id="profile-details"><h2>個人資料</h2><div class="profile-preview"><div id="profile-avatar">${avatarMarkup(state.session.name,avatar,"large")}</div><div><strong id="profile-name">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>原顯示名稱：${escapeHtml(state.session.name)}</small></div></div><label for="nickname">暱稱</label><input id="nickname" name="nickname" maxlength="80" value="${escapeHtml(state.session.nickname||"")}" placeholder="可留空，仍會保留原顯示名稱"><label class="editor-label" for="avatar-file">上傳頭像</label><div class="profile-upload"><input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp"><button type="button" class="secondary-button" id="remove-avatar">移除頭像</button></div><p class="muted">PNG、JPEG、WebP，單一檔案最多 400 MB。</p></div><div id="theme-settings"><h2>系統風格</h2><div class="theme-grid" role="group" aria-label="選擇系統風格">${themes.map(option=>`<button type="button" class="theme-card" data-theme-choice="${option.id}" aria-pressed="${option.id===theme}" style="--preview-bg:${option.bg};--preview-surface:${option.surface};--preview-ink:${option.text};--preview-accent:${option.accent}"><div class="theme-preview"><div class="theme-preview-bar"></div><div class="theme-preview-panel">704 公告預覽</div></div><strong>${option.name}</strong><small>${option.description}</small></button>`).join("")}</div></div><p id="profile-message" role="status"></p><footer class="editor-footer"><span>風格可即時預覽，按儲存才會保存到帳號。</span><button class="primary-button" id="save-profile">儲存個人化設定</button></footer></form></main>`;
  bindHeader();bindSettingsTabs();
  const form=document.querySelector("#profile-form"),file=document.querySelector("#avatar-file"),message=document.querySelector("#profile-message"),save=document.querySelector("#save-profile");
@@ -818,9 +818,9 @@ function renderPersonalization(){
  digestForm.hidden=!notificationView;
  document.querySelector('#security-center').hidden=!accountView;
  document.querySelector('.editor-heading h1').textContent=notificationView?'通知':accountView?'帳號管理':'個人化';
- document.querySelector('.editor-heading p').textContent=notificationView?'驗證必要的電子郵件信箱，並管理選用的裝置通知。':accountView?'管理暱稱、頭像與密碼。':'選擇系統風格與全站桌布。';
+ document.querySelector('.editor-heading p').textContent=notificationView?'驗證必要的電子郵件信箱，並管理選用的裝置通知。':accountView?'管理暱稱、頭像與密碼。':'全站統一使用曜石工作台，可設定自己的桌布。';
  save.textContent=accountView?'儲存個人資料':'儲存系統風格';
- form.querySelector('.editor-footer span').textContent=accountView?'儲存後套用頭像與暱稱。':'風格可跨頁預覽，按儲存後，重新登入也會保留。';
+ form.querySelector('.editor-footer span').textContent=accountView?'儲存後套用頭像與暱稱。':'所有帳號一律使用曜石工作台，不受過去的風格設定影響。';
 }
 function renderSiteSettings() {
   app.innerHTML = `${headerTemplate()}<main id="main-content" class="editor-shell settings-shell" tabindex="-1">${settingsTabs()}

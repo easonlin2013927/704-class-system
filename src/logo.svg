@@ -1,10 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
-  <title id="title">704 班級系統</title>
-  <desc id="desc">深藍色方形班牌，中央寫有 704，右下角有珊瑚紅書籤。</desc>
-  <rect x="6" y="6" width="116" height="116" rx="22" fill="#fffdf8" stroke="#1c2a36" stroke-width="7"/>
-  <path d="M10 30a20 20 0 0 1 20-20h68a20 20 0 0 1 20 20v13H10z" fill="#24517a"/>
-  <text x="64" y="83" fill="#1c2a36" font-family="Arial, sans-serif" font-size="46" font-weight="800" text-anchor="middle">704</text>
-  <path d="M92 81h20v37l-10-7-10 7z" fill="#d2645a" stroke="#1c2a36" stroke-width="4" stroke-linejoin="round"/>
-  <circle cx="28" cy="26" r="4" fill="#fffdf8"/>
-  <circle cx="42" cy="26" r="4" fill="#fffdf8"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><title>704班級系統</title><rect width="128" height="128" fill="#080808"/><g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><rect x="26" y="26" width="76" height="76" rx="0"/><path d="M37 51H51L41 77 M59 51H69V77H59Z M78 51V65H91 M88 51V77"/></g></svg>

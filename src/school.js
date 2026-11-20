@@ -1,5 +1,5 @@
-import { cloud } from './cloud.js?v=0.29.0';
-import { renderChat } from './chat.js?v=0.29.0';
+import { cloud } from './cloud.js?v=0.29.1';
+import { renderChat } from './chat.js?v=0.29.1';
 import {lineIcon,navigationIcon} from './interface-icons.js';
 let poll=null;
 export function disposeSchool(){if(poll)clearInterval(poll);poll=null;}
