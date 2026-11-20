@@ -6,13 +6,20 @@
 - 內容依學生、教師與小老師分類介紹，排除維護人員，並使用固定 PWA 入口。
 - 簡報採用 HTML5／CSS 風格的 Liquid Glass 視覺語言，PowerPoint 內使用可編輯元件與淡入轉場呈現。
 
-## v0.28.4 永久入口（網址不隨版本變更）
+## v0.29.0 永久入口（網址不隨版本變更）
 
 - 學生 PWA 安裝：[https://easonlin2013927.github.io/704-class-system/student/](https://easonlin2013927.github.io/704-class-system/student/)
 - 教師／小老師 PWA 安裝：[https://easonlin2013927.github.io/704-class-system/teacher/](https://easonlin2013927.github.io/704-class-system/teacher/)
 - 管理員登入：[https://easonlin2013927.github.io/704-class-system/admin/](https://easonlin2013927.github.io/704-class-system/admin/)
 
 以上網址不含版本號，未來發布新版仍使用相同入口。管理員入口是一般網頁，不強制安裝 PWA。
+
+## v0.29.0 曜石工作台
+
+- 新預設外觀採墨黑背景、細線圖示、清楚的文字層級與輕量動畫，涵蓋登入、公告、設定與班級功能。
+- 行動裝置使用底部導覽與更多功能選單；保留其他個人化風格供切換。
+- 修正選取風格後切換功能便還原的問題；預覽可跨頁保留，按「儲存系統風格」後保存至帳號。
+- 更新 PWA 快取版本，固定入口網址不變。本版只更新前端，無須更新 API 容器或 Worker。
 
 ## v0.28.4 UI 樣式緊急修正
 

@@ -14,6 +14,7 @@ const styles = [
   "responsive.css",
   "login-layout.css",
   "v025.css",
+  "resend-system.css",
   "offline.css",
 ];
 

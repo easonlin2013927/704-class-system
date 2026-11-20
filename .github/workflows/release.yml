@@ -1,4 +1,4 @@
-name: Publish v0.28.4 release
+name: Publish v0.29.0 release
 on:
   push:
     branches: [main]
@@ -22,6 +22,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.28.4 >/dev/null 2>&1; then
-            gh release create v0.28.4 --target "$GITHUB_SHA" --title "v0.28.4 UI 樣式緊急修正" --notes-file deploy/RELEASE.md docs/presentations/704-class-system-role-guide.pptx
+          if ! gh release view v0.29.0 >/dev/null 2>&1; then
+            gh release create v0.29.0 --target "$GITHUB_SHA" --title "v0.29.0 曜石工作台與風格切換修正" --notes-file deploy/RELEASE.md docs/presentations/704-class-system-role-guide.pptx
           fi

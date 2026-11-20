@@ -1,5 +1,6 @@
-import { cloud } from './cloud.js?v=0.28.4';
-import { renderChat } from './chat.js?v=0.28.4';
+import { cloud } from './cloud.js?v=0.29.0';
+import { renderChat } from './chat.js?v=0.29.0';
+import {lineIcon,navigationIcon} from './interface-icons.js';
 let poll=null;
 export function disposeSchool(){if(poll)clearInterval(poll);poll=null;}
 const esc=(s='')=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -13,13 +14,15 @@ const stamp=d=>new Date(d).toLocaleString('zh-TW');
 const api=(path,method,value)=>cloud.school(path,method,value);
 const button=(label,attrs='',type='button')=>`<button type="${type}" class="secondary-button" ${attrs}>${label}</button>`;
 const empty=label=>`<p class="school-empty">${label}</p>`;
-const heading=(title,desc,action='')=>`<div class="school-heading"><div><h1>${title}</h1><p class="muted">${desc}</p></div>${action}</div>`;
+const headingIcons={'今天':'today','全站搜尋':'search','收件閘':'inbox','檢舉中心':'reports','聊天安全':'safety','班級排行榜':'points','成績簿':'grades','作業簿':'homework','學生紀錄':'records','我的提醒':'records','檢舉處理':'reports','科目管理':'subjects','聊天管理':'moderation','聊天紀錄':'chat','聊天':'chat'};
+const heading=(title,desc,action='')=>`<div class="school-heading"><div class="title-copy"><div class="title-lockup"><span class="page-title-icon">${lineIcon(headingIcons[title]||'more',22)}</span><h1>${title}</h1></div><p class="muted">${desc}</p></div>${action}</div>`;
 const dialog=(id,title,content)=>`<dialog id="${id}" class="form-dialog school-dialog" aria-labelledby="${id}-title"><header><h2 id="${id}-title">${title}</h2>${button('關閉','data-close aria-label="關閉'+esc(title)+'"')}</header>${content}</dialog>`;
 const picker=(students,id='recipient-picker')=>`<fieldset class="student-picker" id="${id}"><legend>選擇學生</legend><div class="selection-tools"><button type="button" class="secondary-button" data-pick="all">全班</button><button type="button" class="secondary-button" data-pick="none">清除</button><strong data-picked-count>已選 0 人</strong></div>${students.map(s=>`<label><input type="checkbox" name="students" value="${s.id}">${esc(name(s))}</label>`).join('')||empty('目前沒有已啟用的學生帳號')}</fieldset>`;
 export function schoolNav(user,current='home'){
  const all=[['today','今天'],['home','公告'],['search','全站搜尋'],...(user.role==='student'||can(user,'homework')?[['homework','作業簿']]:[]),['points','班級排行榜'],...((user.role==='student'||can(user,'grades'))?[['grades','成績簿']]:[]),...((user.role==='student'||can(user,'records'))?[['records',can(user,'records')?'學生紀錄':'我的提醒']]:[]),...(can(user,'reports')?[['reports','檢舉處理']]:[]),...(user.role==='student'?[['chat','聊天'],['report-center','檢舉中心'],['chat-safety','聊天安全']]:[]),...(can(user,'subjects')?[['subjects','科目管理']]:[]),...(can(user,'chat_moderation')?[['moderation','聊天管理'],['adminchat','聊天紀錄']]:[])];
- const favorites=new Set(user.favorites||[]),primary=all.filter(([key])=>key==='today'||key==='home'||favorites.has(key)).slice(0,8);if(!favorites.size)for(const key of ['search','homework','points']){const item=all.find(x=>x[0]===key);if(item&&!primary.some(x=>x[0]===key))primary.push(item);}const more=all.filter(([key])=>!primary.some(x=>x[0]===key));
- return `<nav class="school-nav" aria-label="功能導覽">${primary.map(([key,label])=>`<button type="button" data-school-view="${key}" aria-current="${current===key?'page':'false'}">${label}</button>`).join('')}<details class="nav-more" ${more.some(([key])=>key===current)?'open':''}><summary>更多功能</summary>${more.map(([key,label])=>`<button type="button" data-school-view="${key}" aria-current="${current===key?'page':'false'}">${label}</button>`).join('')}</details></nav>`;
+ const favorites=new Set(user.favorites||[]),primary=all.filter(([key])=>key==='today'||key==='home'||favorites.has(key)).slice(0,4);if(!favorites.size)for(const key of ['search','homework']){const navItem=all.find(x=>x[0]===key);if(navItem&&!primary.some(x=>x[0]===key)&&primary.length<4)primary.push(navItem);}const more=all.filter(([key])=>!primary.some(x=>x[0]===key));
+ const renderItem=([key,label])=>`<button type="button" data-school-view="${key}" data-nav-key="${key}" aria-current="${current===key?'page':'false'}"><span class="nav-icon">${lineIcon(navigationIcon[key]||'more',20)}</span><span class="nav-label">${label}</span></button>`;
+ return `<nav class="school-nav" aria-label="功能導覽"><div class="nav-primary"><span class="nav-section-label">班級工作台</span>${primary.map(renderItem).join('')}</div>${more.length?`<details class="nav-more" ${more.some(([key])=>key===current)?'open':''}><summary><span class="nav-icon">${lineIcon('more',20)}</span><span class="nav-label">更多功能</span></summary><div class="nav-secondary"><span class="nav-section-label">其他工具</span>${more.map(renderItem).join('')}</div></details>`:''}</nav>`;
 }
 export async function loadStudentHome(node,user,onNavigate){
  if(user.role!=='student'||!node)return;

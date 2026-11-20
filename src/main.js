@@ -1,24 +1,26 @@
-import { cloud } from "./cloud.js?v=0.28.4";
-import { initConnectivityGuard } from "./connectivity.js?v=0.28.4";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.28.4';
-import {mountMailboxes} from './mailboxes.js?v=0.28.4';
-import {mountMailTest} from './mail-test.js?v=0.28.4';
-import { portals, portalRole } from "./portal.js?v=0.28.4";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.28.4";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.28.4';
+import { cloud } from "./cloud.js?v=0.29.0";
+import { initConnectivityGuard } from "./connectivity.js?v=0.29.0";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.29.0';
+import {mountMailboxes} from './mailboxes.js?v=0.29.0';
+import {mountMailTest} from './mail-test.js?v=0.29.0';
+import { portals, portalRole } from "./portal.js?v=0.29.0";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.29.0";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.29.0';
+import {lineIcon,bindIconMotion} from './interface-icons.js';
 
 initConnectivityGuard();
 
 let activeRole = portalRole(location.hash);
 function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';}
 function registerPwaInBackground(){
+  if(['127.0.0.1','localhost'].includes(location.hostname))return;
   if(!('serviceWorker' in navigator))return;
   const register=()=>navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).catch(()=>{});
   if('requestIdleCallback' in window)requestIdleCallback(register,{timeout:2500});
   else setTimeout(register,1200);
 }
 setupPwa(activeRole);
-const isPwaWindow=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const isPwaWindow=()=>['127.0.0.1','localhost'].includes(location.hostname)||matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;if(activeRole!=='admin')render();});
 window.addEventListener('appinstalled',()=>{installPrompt=null;render();});
@@ -49,6 +51,7 @@ const state = {
   session: null,
   settingsOpen: false,
   settingsTab: "personal",
+  themePreview: null,
   schoolView: 'home',
   schoolCreate: null,
   banner: { enabled: false, content: "" },
@@ -194,7 +197,8 @@ setInterval(syncPresence,45000);
 document.addEventListener('visibilitychange',syncPresence);
 function render() {
   disposeSchool();
-  applyTheme(state.session?.theme || "dark");
+  if(!state.session || state.themePreview?.accountId!==state.session.id)state.themePreview=null;
+  applyTheme(state.themePreview?.theme || state.session?.theme || "dark");
   syncPresence();
   const wallpaper=state.session?.wallpaper_url||'';
   const validWallpaper=/^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/.test(wallpaper)||/^https:\/\/[^/]+\/school\/profile-files\/[0-9a-f-]{36}$/i.test(wallpaper);
@@ -272,16 +276,16 @@ function headerTemplate() {
   const isTeacher = ["teacher","assistant"].includes(state.session.role);
   return `
     <a class="skip-link" href="#main-content">跳至主要內容</a><header class="topbar">
-      <button class="wordmark" data-home aria-label="回到公告首頁"><img class="brand-mark small" src="./src/logo.svg" alt="" /><span><strong>704班級系統</strong><small>班級公告</small></span></button><button class="icon-button" data-school-view="notifications" style="margin-right:auto" aria-label="收件閘" title="收件閘"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg></button>
+      <button class="wordmark" data-home aria-label="回到公告首頁"><img class="brand-mark small" src="./src/logo.svg" alt="" /><span><strong>704班級系統</strong><small>班級公告</small></span></button><button class="icon-button animated-icon" data-school-view="notifications" style="margin-right:auto" aria-label="收件閘" title="收件閘">${lineIcon('inbox',22)}</button>
       <nav class="top-actions">
         <a class="secondary-button repo-button" href="https://github.com/easonlin2013927/704-class-system" target="_blank" rel="noopener noreferrer" aria-label="開啟 GitHub repo">GitHub ↗</a>
-        <button class="icon-button" data-home title="首頁" aria-label="首頁">${icon("home")}</button>
+        <button class="icon-button animated-icon" data-home title="首頁" aria-label="首頁">${lineIcon('home',20)}</button>
         <span class="role-chip">${portals[state.session.role].label}端</span>
         <div class="user-block">${avatarMarkup(state.session.name,state.session.avatar_url)}<span><strong title="${escapeHtml(identityName(state.session.name,state.session.nickname))}">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>${state.session.role === "admin" ? "系統管理" : isTeacher ? "公告管理" : "704"}</small></span></div>
-${state.session.permissions?.accounts ? `<button class="secondary-button" id="open-accounts">${state.session.role==='admin'?"帳號管理":"學生帳號"}</button>` : ""}
-${state.session.role==='admin'&&state.session.permissions?.site_settings?'<button class="secondary-button" id="open-health">健康與備份</button>':''}
-<button class="secondary-button" id="open-settings">設定</button>
-        <button class="icon-button" id="logout" title="登出" aria-label="登出">${icon("logout")}</button>
+${state.session.permissions?.accounts ? `<button class="secondary-button header-action" id="open-accounts">${lineIcon('accounts',18)}<span>${state.session.role==='admin'?"帳號管理":"學生帳號"}</span></button>` : ""}
+${state.session.role==='admin'&&state.session.permissions?.site_settings?`<button class="secondary-button header-action" id="open-health">${lineIcon('health',18)}<span>健康與備份</span></button>`:''}
+<button class="secondary-button header-action" id="open-settings">${lineIcon('settings',18)}<span>設定</span></button>
+        <button class="icon-button animated-icon" id="logout" title="登出" aria-label="登出">${lineIcon('logout',20)}</button>
       </nav>
     </header>${state.marquee.enabled && state.marquee.content ? `<div class="site-marquee" role="status"><strong>最新消息</strong><span>${escapeHtml(state.marquee.content)}</span></div>` : ""}${schoolNav(state.session,state.schoolView)}`;
 }
@@ -393,6 +397,7 @@ function navigateSchool(view,create=null){state.schoolView=view;state.schoolCrea
 function renderSchool(){app.innerHTML=`${headerTemplate()}<main id="main-content" class="page-shell school-shell" tabindex="-1"><div id="school-page"></div></main>`;bindHeader();mountSchool({node:document.querySelector('#school-page'),user:state.session,view:state.schoolView,create:state.schoolCreate,notify:toast,navigate:navigateSchool});state.schoolCreate=null;}
 function goHome(){navigateSchool('home');}
 function bindHeader() {
+  bindIconMotion(document.querySelector('#app'));
   document.querySelectorAll('[data-school-view]').forEach(b=>b.addEventListener('click',()=>navigateSchool(b.dataset.schoolView)));
   document.querySelector("#open-settings")?.addEventListener("click",()=>{state.schoolView='home';state.settingsOpen=true;state.settingsTab="personal";state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();});
   document.querySelector("#open-accounts")?.addEventListener("click",()=>{state.schoolView='home';state.settingsOpen=false;state.adminView="accounts";state.editingId=null;state.selectedId=null;render();});
@@ -433,7 +438,7 @@ function renderDashboard() {
     ${headerTemplate()}
     <main id="main-content" class="page-shell" tabindex="-1">
       <section class="hero-row">
-        <div><h1>${isTeacher ? "公告管理" : "公告"}</h1><p>${isTeacher ? "清楚傳遞每一項班級資訊。" : "今天也別忘了看看班級的新消息。"}</p></div>
+        <div class="title-copy"><div class="title-lockup"><span class="page-title-icon">${lineIcon('announcement',22)}</span><h1>${isTeacher ? "公告管理" : "公告"}</h1></div><p>${isTeacher ? "清楚傳遞每一項班級資訊。" : "今天也別忘了看看班級的新消息。"}</p></div>
         ${isTeacher||state.session.permissions?.homework||state.session.permissions?.records ? `<div class="create-menu"><button class="primary-button" id="create-toggle" aria-expanded="false" aria-controls="create-options">${icon("plus",18)} 新增</button><div id="create-options" class="create-options" hidden>${state.session.permissions?.publish?'<button id="new-post">公告</button><button id="new-activity">活動</button>':''}${state.session.permissions?.homework?'<button data-school-create="homework">作業</button>':''}${state.session.permissions?.records?'<button data-school-create="missing">缺交項目</button><button data-school-create="feedback">個別評語／提醒</button>':''}</div></div>` : ""}
       </section>
       <div id="student-home-overview"></div>
@@ -778,7 +783,7 @@ function renderStudentAccount(){
  document.querySelector('#student-password').addEventListener('submit',async event=>{event.preventDefault();const f=event.currentTarget,d=new FormData(f),message=document.querySelector('#student-password-message'),button=f.querySelector('button');if(d.get('new_password')!==d.get('confirmation')){message.textContent='兩次輸入的新密碼不相同';return;}button.disabled=true;try{const profile=await cloud.changePassword({current_password:d.get('current_password'),new_password:d.get('new_password')});state.session={...state.session,...profile,name:profile.display_name};f.reset();message.textContent='密碼已更新';}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
 }
 function renderPersonalization(){
- let avatar=state.session.avatar_url||"",theme=state.session.theme||"dark";
+ let avatar=state.session.avatar_url||"",theme=state.themePreview?.theme||state.session.theme||"dark";
  app.innerHTML=`${headerTemplate()}<main class="editor-shell settings-shell">${settingsTabs()}<div class="editor-heading"><span class="eyebrow dark">PERSONALIZATION</span><h1>個人化</h1><p>選擇系統風格、設定頭像與暱稱，儲存後會跟隨帳號保留。</p></div><form id="profile-form" class="editor-card"><div id="profile-details"><h2>個人資料</h2><div class="profile-preview"><div id="profile-avatar">${avatarMarkup(state.session.name,avatar,"large")}</div><div><strong id="profile-name">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>原顯示名稱：${escapeHtml(state.session.name)}</small></div></div><label for="nickname">暱稱</label><input id="nickname" name="nickname" maxlength="80" value="${escapeHtml(state.session.nickname||"")}" placeholder="可留空，仍會保留原顯示名稱"><label class="editor-label" for="avatar-file">上傳頭像</label><div class="profile-upload"><input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp"><button type="button" class="secondary-button" id="remove-avatar">移除頭像</button></div><p class="muted">PNG、JPEG、WebP，單一檔案最多 400 MB。</p></div><div id="theme-settings"><h2>系統風格</h2><div class="theme-grid" role="group" aria-label="選擇系統風格">${themes.map(option=>`<button type="button" class="theme-card" data-theme-choice="${option.id}" aria-pressed="${option.id===theme}" style="--preview-bg:${option.bg};--preview-surface:${option.surface};--preview-ink:${option.text};--preview-accent:${option.accent}"><div class="theme-preview"><div class="theme-preview-bar"></div><div class="theme-preview-panel">704 公告預覽</div></div><strong>${option.name}</strong><small>${option.description}</small></button>`).join("")}</div></div><p id="profile-message" role="status"></p><footer class="editor-footer"><span>風格可即時預覽，按儲存才會保存到帳號。</span><button class="primary-button" id="save-profile">儲存個人化設定</button></footer></form></main>`;
  bindHeader();bindSettingsTabs();
  const form=document.querySelector("#profile-form"),file=document.querySelector("#avatar-file"),message=document.querySelector("#profile-message"),save=document.querySelector("#save-profile");
@@ -801,8 +806,8 @@ function renderPersonalization(){
  form.elements.nickname.addEventListener("input",preview);
  file.addEventListener("change",async()=>{if(!file.files[0])return;save.disabled=true;try{message.textContent='正在上傳頭像 0%';avatar=await cloud.uploadProfileFile('avatar',file.files[0],progress=>message.textContent=`正在上傳頭像 ${progress}%`);preview();message.textContent="頭像已上傳，請儲存其他個人化設定。";}catch(error){message.textContent=error.message;file.value="";}finally{save.disabled=false;}});
  document.querySelector("#remove-avatar").addEventListener("click",()=>{avatar="";file.value="";preview();});
- document.querySelectorAll("[data-theme-choice]").forEach(button=>button.addEventListener("click",()=>{theme=button.dataset.themeChoice;applyTheme(theme);document.querySelectorAll("[data-theme-choice]").forEach(choice=>choice.setAttribute("aria-pressed",String(choice===button)));}));
- form.addEventListener("submit",async event=>{event.preventDefault();save.disabled=true;try{const profile=await cloud.saveProfile({nickname:form.elements.nickname.value,theme,avatar_url:avatar});state.session={...state.session,...profile,name:profile.display_name};state.announcements=await cloud.list();render();toast("個人化設定已儲存");}catch(error){message.textContent=error.message;}finally{save.disabled=false;}});
+ document.querySelectorAll("[data-theme-choice]").forEach(button=>button.addEventListener("click",()=>{theme=button.dataset.themeChoice;state.themePreview={accountId:state.session.id,theme};applyTheme(theme);message.textContent='風格已套用至本次登入的所有頁面；按「儲存系統風格」即可永久保存。';document.querySelectorAll("[data-theme-choice]").forEach(choice=>choice.setAttribute("aria-pressed",String(choice===button)));}));
+ form.addEventListener("submit",async event=>{event.preventDefault();save.disabled=true;const accountId=state.session.id;try{const profile=await cloud.saveProfile({nickname:form.elements.nickname.value,theme,avatar_url:avatar});if(state.session?.id!==accountId)return;state.session={...state.session,...profile,name:profile.display_name};if(state.themePreview?.theme===profile.theme)state.themePreview=null;render();toast("個人化設定已儲存");}catch(error){message.textContent=error.message;}finally{save.disabled=false;}});
  const accountView=state.settingsTab==='account',notificationView=state.settingsTab==='notifications';
  document.querySelector('#profile-details').hidden=!accountView;
  document.querySelector('#theme-settings').hidden=accountView||notificationView;
@@ -815,7 +820,7 @@ function renderPersonalization(){
  document.querySelector('.editor-heading h1').textContent=notificationView?'通知':accountView?'帳號管理':'個人化';
  document.querySelector('.editor-heading p').textContent=notificationView?'驗證必要的電子郵件信箱，並管理選用的裝置通知。':accountView?'管理暱稱、頭像與密碼。':'選擇系統風格與全站桌布。';
  save.textContent=accountView?'儲存個人資料':'儲存系統風格';
- form.querySelector('.editor-footer span').textContent=accountView?'儲存後套用頭像與暱稱。':'風格可即時預覽，按儲存才會保存到帳號。';
+ form.querySelector('.editor-footer span').textContent=accountView?'儲存後套用頭像與暱稱。':'風格可跨頁預覽，按儲存後，重新登入也會保留。';
 }
 function renderSiteSettings() {
   app.innerHTML = `${headerTemplate()}<main id="main-content" class="editor-shell settings-shell" tabindex="-1">${settingsTabs()}

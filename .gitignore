@@ -6,6 +6,8 @@ dist/
 .taste-skill/
 shots/
 .deck-build/
+.playwright-cli/
+.tmp-*.png
 .env
 .env.*
 !.env.example

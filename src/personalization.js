@@ -1,5 +1,5 @@
 export const themes = [
- {id:'dark',name:'鉛字深灰',description:'深灰紙面、淺色文字與藍墨標記',bg:'#20262a',surface:'#293036',text:'#f4f0e6',accent:'#9dc3df'},
+ {id:'dark',name:'曜石工作台',description:'墨黑介面、精準細線與暖白文字（系統預設）',bg:'#000000',surface:'#0a0a0c',text:'#fcfdff',accent:'#fcfdff'},
  {id:'light',name:'班務紙本',description:'米白紙張、深色鉛字與藍墨重點',bg:'#f3f0e8',surface:'#fffdf8',text:'#1c2a36',accent:'#24517a'},
  {id:'ocean',name:'海洋藍',description:'淡藍紙面、墨青文字與海藍標記',bg:'#edf3f4',surface:'#fbfdfc',text:'#18313a',accent:'#1d6474'},
  {id:'forest',name:'黑板森林',description:'深綠黑板、粉筆文字與黃色重點',bg:'#172d26',surface:'#1f3930',text:'#f1eee1',accent:'#f0cf72'},
