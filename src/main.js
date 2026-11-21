@@ -1,12 +1,12 @@
 import { cloud } from "./cloud.js";
 import { mountGoogleLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.30.1";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.30.1';
-import {mountMailboxes} from './mailboxes.js?v=0.30.1';
-import {mountMailTest} from './mail-test.js?v=0.30.1';
-import { portals, portalRole } from "./portal.js?v=0.30.1";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.30.1";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.30.1';
+import { initConnectivityGuard } from "./connectivity.js?v=0.30.2";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.30.2';
+import {mountMailboxes} from './mailboxes.js?v=0.30.2';
+import {mountMailTest} from './mail-test.js?v=0.30.2';
+import { portals, portalRole } from "./portal.js?v=0.30.2";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.30.2";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.30.2';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 
 initConnectivityGuard();
@@ -227,11 +227,11 @@ function renderPasswordChange(){
 }
 async function finishLogin(profile) {
       if ((profile.role === "assistant" ? "teacher" : profile.role) !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
-      const [access,preferences]=await Promise.all([cloud.school('permissions').catch(()=>null),cloud.school('preferences').catch(()=>null)]);
+      const {access,preferences,mailboxes,announcements,countdowns}=await cloud.loginData(profile);
       state.session = { ...profile, name: profile.display_name,permissions:access?.permissions||{},favorites:preferences?.favorites||[] };
       state.schoolView = 'home';
-      if(!profile.must_change_password){const boxes=await cloud.school('mailboxes').catch(()=>null);if(boxes&&!boxes.some(x=>x.verified)){state.settingsOpen=true;state.settingsTab='account';}}
-      if(!profile.must_change_password&&!profile.must_add_email&&!profile.must_change_email){state.announcements = await cloud.list();state.countdowns = await cloud.countdowns();}
+      if(mailboxes&&!mailboxes.some(x=>x.verified)){state.settingsOpen=true;state.settingsTab='account';}
+      state.announcements=announcements;state.countdowns=countdowns;
       state.selectedId = null;
       state.editingId = null;
       render();
@@ -907,4 +907,4 @@ function mountBroadcast(){
 render();
 registerPwaInBackground();
 refreshBanner();
-if(activeRole==='admin'||isPwaWindow())cloud.me().then(async profile=>{if((profile.role==='assistant'?'teacher':profile.role)!==activeRole)return;const [access,preferences]=await Promise.all([cloud.school('permissions').catch(()=>null),cloud.school('preferences').catch(()=>null)]);state.session={...profile,name:profile.display_name,permissions:access?.permissions||{},favorites:preferences?.favorites||[]};if(!profile.must_change_password&&!profile.must_add_email&&!profile.must_change_email){state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();const boxes=await cloud.school('mailboxes').catch(()=>null);if(boxes&&!boxes.some(x=>x.verified)){state.settingsOpen=true;state.settingsTab='account';}}render();}).catch(()=>{});
+if(activeRole==='admin'||isPwaWindow())cloud.me().then(profile=>{if((profile.role==='assistant'?'teacher':profile.role)!==activeRole)return;return finishLogin(profile);}).catch(()=>{});

@@ -26,6 +26,17 @@ async function request(path, options = {}) {
   } catch(error) {if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:false,message:error.message}}));throw error;} finally { if(mutation)window.dispatchEvent(new Event('operation-end')); }
 }
 export const cloud = {
+  async loginData(profile){
+    const restricted=profile.must_change_password||profile.must_add_email||profile.must_change_email;
+    const [access,preferences,mailboxes,announcements,countdowns]=await Promise.all([
+      cloud.school('permissions').catch(()=>null),
+      cloud.school('preferences').catch(()=>null),
+      profile.must_change_password?null:cloud.school('mailboxes').catch(()=>null),
+      restricted?[]:cloud.list(),
+      restricted?[]:cloud.countdowns(),
+    ]);
+    return {access,preferences,mailboxes,announcements,countdowns};
+  },
   authConfig(){return request('/public/auth-config');},
   async loginFirebase(firebaseToken,portal,remember=false){
     token=null;

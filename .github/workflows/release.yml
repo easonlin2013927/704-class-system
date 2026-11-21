@@ -1,4 +1,4 @@
-name: Publish v0.30.1 release
+name: Publish v0.30.2 release
 on:
   push:
     branches: [main]
@@ -16,12 +16,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node --test server/password.test.mjs server/firebase-auth.test.mjs deploy/worker/proxy.test.mjs && node src/firebase-auth.test.mjs && node src/cloud-auth.test.mjs
+      - run: node --test server/password.test.mjs server/firebase-auth.test.mjs deploy/worker/proxy.test.mjs && node src/firebase-auth.test.mjs && node src/cloud-auth.test.mjs && node src/login-loading.test.mjs
       - run: node --check server/index.mjs && node --check server/account.mjs && node --check server/school.mjs && node --check server/system-center.mjs && node --check server/enhancements.mjs && node --check server/mail-events.mjs && node --check src/school.js && npm run check && npm run build
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.30.1 >/dev/null 2>&1; then
-            gh release create v0.30.1 --target "$GITHUB_SHA" --title "v0.30.1 Google 登入與個人風格" --notes-file deploy/RELEASE.md docs/presentations/704-class-system-role-guide.pptx
+          if ! gh release view v0.30.2 >/dev/null 2>&1; then
+            gh release create v0.30.2 --target "$GITHUB_SHA" --title "v0.30.2 登入載入改善" --notes-file deploy/RELEASE.md docs/presentations/704-class-system-role-guide.pptx
           fi
