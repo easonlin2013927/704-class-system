@@ -5,8 +5,14 @@ const defer=name=>{started.push(name);return new Promise(resolve=>pending.push((
 cloud.school=name=>defer(name);
 cloud.list=()=>defer('announcements');
 cloud.countdowns=()=>defer('countdowns');
-const loading=cloud.loginData({});
+let accessShown=false,finished=false;
+const loading=cloud.loginData({},()=>{accessShown=true;});
+loading.then(()=>{finished=true;});
 assert.deepEqual(started,['permissions','preferences','mailboxes','announcements','countdowns']);
+pending.shift()();
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(accessShown,true);
+assert.equal(finished,false,'Access must render before optional data completes');
 pending.splice(0).forEach(resolve=>resolve());
 assert.equal((await loading).announcements,'announcements');
 started.length=0;

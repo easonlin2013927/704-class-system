@@ -1,12 +1,12 @@
 import { cloud } from "./cloud.js";
 import { mountGoogleLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.30.2";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.30.2';
-import {mountMailboxes} from './mailboxes.js?v=0.30.2';
-import {mountMailTest} from './mail-test.js?v=0.30.2';
-import { portals, portalRole } from "./portal.js?v=0.30.2";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.30.2";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.30.2';
+import { initConnectivityGuard } from "./connectivity.js?v=0.30.3";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.30.3';
+import {mountMailboxes} from './mailboxes.js?v=0.30.3';
+import {mountMailTest} from './mail-test.js?v=0.30.3';
+import { portals, portalRole } from "./portal.js?v=0.30.3";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.30.3";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.30.3';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 
 initConnectivityGuard();
@@ -61,6 +61,7 @@ const state = {
   adminView: "dashboard",
   marquee: { enabled: false, content: "" },
   announcements: [],
+  loginLoading: false,
   search: "",
   category: "all",
   selectedId: null,
@@ -227,11 +228,23 @@ function renderPasswordChange(){
 }
 async function finishLogin(profile) {
       if ((profile.role === "assistant" ? "teacher" : profile.role) !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
-      const {access,preferences,mailboxes,announcements,countdowns}=await cloud.loginData(profile);
-      state.session = { ...profile, name: profile.display_name,permissions:access?.permissions||{},favorites:preferences?.favorites||[] };
-      state.schoolView = 'home';
-      if(mailboxes&&!mailboxes.some(x=>x.verified)){state.settingsOpen=true;state.settingsTab='account';}
-      state.announcements=announcements;state.countdowns=countdowns;
+      const loading=cloud.loginData(profile,access=>{
+        state.session={...profile,name:profile.display_name,permissions:access?.permissions||{},favorites:[]};
+        state.schoolView='home';state.loginLoading=true;
+        state.announcements=[];state.countdowns=[];
+        state.selectedId=null;state.editingId=null;
+        render();
+      });
+      try{
+        const {preferences,mailboxes,announcements,countdowns}=await loading;
+        if(state.session?.id!==profile.id)return;
+        state.session.favorites=preferences?.favorites||[];
+        if(mailboxes&&!mailboxes.some(x=>x.verified)&&!state.settingsOpen&&state.schoolView==='home'&&state.editingId===null&&!state.selectedId){state.settingsOpen=true;state.settingsTab='account';render();}
+        state.announcements=announcements;state.countdowns=countdowns;
+      }catch(error){if(state.session?.id===profile.id)toast(error.message,'error');}
+      if(state.session?.id!==profile.id)return;
+      state.loginLoading=false;
+      if(state.schoolView!=='home'||state.editingId!==null||state.selectedId||state.settingsOpen)return;
       state.selectedId = null;
       state.editingId = null;
       render();
@@ -456,8 +469,9 @@ function renderDashboard() {
       </section>
       <section class="section-heading"><div><h2>${state.category === "all" ? "最新公告" : categories[state.category].label}</h2><span>${results.length} 則消息</span></div></section>
       <div class="announcement-grid">
+        ${state.loginLoading?'<p role="status">已登入，正在載入公告與活動…</p>':''}
         ${activityCards(isTeacher)}
-        ${results.length ? results.map((item) => announcementCard(item, isTeacher)).join("") : state.countdowns.length ? "" : `<div class="empty-state">${icon("search", 32)}<h3>找不到符合的公告</h3><p>試著更換關鍵字或其他分類。</p></div>`}
+        ${results.length ? results.map((item) => announcementCard(item, isTeacher)).join("") : state.countdowns.length||state.loginLoading ? "" : `<div class="empty-state">${icon("search", 32)}<h3>找不到符合的公告</h3><p>試著更換關鍵字或其他分類。</p></div>`}
       </div>
       ${activityDialog(isTeacher)}
     </main>`;

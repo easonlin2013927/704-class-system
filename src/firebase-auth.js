@@ -26,13 +26,16 @@ export function googleLoginError(error) {
   return new Error(messages[error.code] || error.message || 'Google 登入失敗，請稍後重試。');
 }
 
-export async function exchangeGoogleLogin(sdk, auth, portal, remember, exchange) {
+export async function exchangeGoogleLogin(sdk, auth, portal, remember, exchange, onStage=()=>{}) {
   const provider = new sdk.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   try {
     const result = await sdk.signInWithPopup(auth, provider);
     const token = await result.user.getIdToken();
-    return await exchange(token, portal, remember);
+    onStage('正在驗證班級系統帳號…');
+    const profile=await exchange(token, portal, remember);
+    onStage('已驗證，正在載入操作權限…');
+    return profile;
   } finally {
     await sdk.signOut(auth).catch(() => {});
   }
@@ -68,11 +71,12 @@ export async function mountGoogleLogin(button, portal, onProfile, onError) {
     try {
       const remember = !!document.querySelector('#login-form [name="remember"]')?.checked;
       const profile = await exchangeGoogleLogin(firebase.sdk, firebase.auth, portal, remember,
-        (token, role, save) => cloud.loginFirebase(token, role, save));
+        (token, role, save) => cloud.loginFirebase(token, role, save),message=>{if(button.isConnected)button.textContent=message;});
       if (button.isConnected) await onProfile(profile);
     } catch (error) { onError(googleLoginError(error)); }
     finally {
       button.disabled = false;
+      button.textContent = '使用 Google 登入';
       if (passwordButton) passwordButton.disabled = false;
     }
   };
