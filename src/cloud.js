@@ -26,6 +26,13 @@ async function request(path, options = {}) {
   } catch(error) {if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:false,message:error.message}}));throw error;} finally { if(mutation)window.dispatchEvent(new Event('operation-end')); }
 }
 export const cloud = {
+  authConfig(){return request('/public/auth-config');},
+  async loginFirebase(firebaseToken,portal,remember=false){
+    token=null;
+    const result=await request('/auth/firebase',{method:'POST',body:JSON.stringify({token:firebaseToken,portal,remember})});
+    token=result.token;
+    return result.profile;
+  },
   presence(){return request('/school/presence',{method:'POST',silent:true});},
   school(path,method='GET',value){return request('/school/'+path,{method,...(value===undefined?{}:{body:JSON.stringify(value)})});},
   async downloadBackup(id){

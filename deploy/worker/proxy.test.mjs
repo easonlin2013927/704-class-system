@@ -18,6 +18,16 @@ test('authenticated request keeps authorization and history cursor; query cannot
  const id='11111111-1111-4111-8111-111111111111';
  const r=await proxyRequest(new Request(`${base}/school/rooms/${id}/messages?before=${id}&url=https://other.example`,{headers:{Authorization:'Bearer fixture'}}),{fetchUpstream:async(url,options)=>{assert.equal(new URL(url).host,'api704.easonlin2013927.dpdns.org');assert.equal(new URL(url).searchParams.get('before'),id);assert.equal(options.headers.get('Authorization'),'Bearer fixture');return json([]);}});assert.equal(r.status,200);
 });
+
+test('Firebase configuration and exchange are allowed; only successful exchanges set the session cookie',async()=>{
+ const config=await proxyRequest(new Request(base+'/public/auth-config',{headers:{Origin:origin}}),{fetchUpstream:async url=>{assert.equal(new URL(url).pathname,'/public/auth-config');return json({firebase:{enabled:true,config:{projectId:'fixture'}}});}});
+ assert.equal(config.status,200);assert.equal(config.headers.get('Cache-Control'),'no-store');
+ const token='a'.repeat(64),body=JSON.stringify({token:'firebase-fixture',portal:'student',remember:true});
+ const exchanged=await proxyRequest(new Request(base+'/auth/firebase',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body}),{fetchUpstream:async(url,options)=>{assert.equal(new URL(url).pathname,'/auth/firebase');assert.equal(new TextDecoder().decode(options.body),body);return json({token,remembered:true});}});
+ assert.equal(exchanged.status,200);assert.equal((await exchanged.json()).token,token);assert.match(exchanged.headers.get('Set-Cookie'),new RegExp(`__Host-704session=${token}; Path=/; Secure; HttpOnly; SameSite=None; Partitioned; Max-Age=34560000`));assert.equal(exchanged.headers.get('Cache-Control'),'no-store');
+ const denied=await proxyRequest(new Request(base+'/auth/firebase',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body}),{fetchUpstream:async()=>json({message:'沒有權限'},403)});
+ assert.equal(denied.status,403);assert.equal(denied.headers.get('Set-Cookie'),null);assert.equal((await proxyRequest(new Request(base+'/auth/arbitrary'))).status,404);
+});
 test('reject oversized bodies, unknown paths, redirects, HTML challenges, and network failures',async()=>{
  let hits=0;const upstream=async()=>{hits++;return json({});};
  const huge=await proxyRequest(new Request(base+'/login',{method:'POST',body:'x'.repeat(4*1024*1024+1)}),{fetchUpstream:upstream});assert.equal(huge.status,413);assert.equal(hits,0);

@@ -1,11 +1,12 @@
-import { cloud } from "./cloud.js?v=0.29.1";
-import { initConnectivityGuard } from "./connectivity.js?v=0.29.1";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.29.1';
-import {mountMailboxes} from './mailboxes.js?v=0.29.1';
-import {mountMailTest} from './mail-test.js?v=0.29.1';
-import { portals, portalRole } from "./portal.js?v=0.29.1";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.29.1";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.29.1';
+import { cloud } from "./cloud.js?v=0.30.0";
+import { mountGoogleLogin } from "./firebase-auth.js";
+import { initConnectivityGuard } from "./connectivity.js?v=0.30.0";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.30.0';
+import {mountMailboxes} from './mailboxes.js?v=0.30.0';
+import {mountMailTest} from './mail-test.js?v=0.30.0';
+import { portals, portalRole } from "./portal.js?v=0.30.0";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.30.0";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.30.0';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 
 initConnectivityGuard();
@@ -224,6 +225,17 @@ function renderPasswordChange(){
  document.querySelector("#password-logout").addEventListener("click",()=>{cloud.logout();state.session=null;render();});
  document.querySelector("#change-password-form").addEventListener("submit",async event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget)),button=event.currentTarget.querySelector("button"),message=document.querySelector("#password-message");if(data.new_password!==data.confirmation){message.textContent="兩次輸入的新密碼不相同";return;}button.disabled=true;try{const profile=await cloud.changePassword(data);state.session={...profile,name:profile.display_name};state.settingsOpen=false;state.adminView="dashboard";state.editingId=null;state.selectedId=null;state.announcements=[];state.countdowns=[];try{state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();}catch(error){toast(error.message,"error");}render();toast("密碼已更新");}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
 }
+async function finishLogin(profile) {
+      if ((profile.role === "assistant" ? "teacher" : profile.role) !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
+      const [access,preferences]=await Promise.all([cloud.school('permissions').catch(()=>null),cloud.school('preferences').catch(()=>null)]);
+      state.session = { ...profile, name: profile.display_name,permissions:access?.permissions||{},favorites:preferences?.favorites||[] };
+      state.schoolView = 'home';
+      if(!profile.must_change_password){const boxes=await cloud.school('mailboxes').catch(()=>null);if(boxes&&!boxes.some(x=>x.verified)){state.settingsOpen=true;state.settingsTab='account';}}
+      if(!profile.must_change_password&&!profile.must_add_email&&!profile.must_change_email){state.announcements = await cloud.list();state.countdowns = await cloud.countdowns();}
+      state.selectedId = null;
+      state.editingId = null;
+      render();
+}
 function renderLogin() {
   const portal = portals[activeRole];
   document.title = portal.title + "｜704班級系統";
@@ -238,6 +250,7 @@ function renderLogin() {
           <div class="portal-pill"><span></span>${portal.eyebrow}</div>
           <h1>${portal.title}</h1>
           <p class="muted">${portal.description}</p>
+          <button type="button" id="google-login" class="secondary-button wide" hidden>使用 Google 登入</button>
           <form id="login-form">
             <label>帳號<input name="account" autocomplete="username" placeholder="請輸入帳號" type="text" required></label>
             <label>密碼<input name="password" type="password" autocomplete="current-password" placeholder="請輸入密碼"></label>
@@ -251,6 +264,7 @@ function renderLogin() {
       </div><footer class="login-footnote">704 班務手冊 <span>讓每一則消息，清楚抵達。</span></footer>
     </main>`;
 
+  mountGoogleLogin(document.querySelector('#google-login'), activeRole, finishLogin, error=>{state.session=null;cloud.logout();toast(error.message,'error');}).catch(error=>toast(error.message,'error'));
   document.querySelector("#login-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -258,15 +272,7 @@ function renderLogin() {
     button.disabled = true;
     try {
       const profile = await cloud.login(data.get("account"), data.get("password"), activeRole, data.has("remember"));
-      if ((profile.role === "assistant" ? "teacher" : profile.role) !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
-      const [access,preferences]=await Promise.all([cloud.school('permissions').catch(()=>null),cloud.school('preferences').catch(()=>null)]);
-      state.session = { ...profile, name: profile.display_name,permissions:access?.permissions||{},favorites:preferences?.favorites||[] };
-      state.schoolView = 'home';
-      if(!profile.must_change_password){const boxes=await cloud.school('mailboxes').catch(()=>null);if(boxes&&!boxes.some(x=>x.verified)){state.settingsOpen=true;state.settingsTab='account';}}
-      if(!profile.must_change_password&&!profile.must_add_email&&!profile.must_change_email){state.announcements = await cloud.list();state.countdowns = await cloud.countdowns();}
-      state.selectedId = null;
-      state.editingId = null;
-      render();
+      await finishLogin(profile);
     } catch (error) { state.session=null; cloud.logout(); toast(error.message, "error"); }
     finally { button.disabled = false; }
   });
@@ -783,7 +789,7 @@ function renderStudentAccount(){
  document.querySelector('#student-password').addEventListener('submit',async event=>{event.preventDefault();const f=event.currentTarget,d=new FormData(f),message=document.querySelector('#student-password-message'),button=f.querySelector('button');if(d.get('new_password')!==d.get('confirmation')){message.textContent='兩次輸入的新密碼不相同';return;}button.disabled=true;try{const profile=await cloud.changePassword({current_password:d.get('current_password'),new_password:d.get('new_password')});state.session={...state.session,...profile,name:profile.display_name};f.reset();message.textContent='密碼已更新';}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
 }
 function renderPersonalization(){
- let avatar=state.session.avatar_url||"",theme="dark";
+ let avatar=state.session.avatar_url||"",theme=state.themePreview?.theme||state.session.theme||"dark";
  app.innerHTML=`${headerTemplate()}<main class="editor-shell settings-shell">${settingsTabs()}<div class="editor-heading"><span class="eyebrow dark">PERSONALIZATION</span><h1>個人化</h1><p>選擇系統風格、設定頭像與暱稱，儲存後會跟隨帳號保留。</p></div><form id="profile-form" class="editor-card"><div id="profile-details"><h2>個人資料</h2><div class="profile-preview"><div id="profile-avatar">${avatarMarkup(state.session.name,avatar,"large")}</div><div><strong id="profile-name">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>原顯示名稱：${escapeHtml(state.session.name)}</small></div></div><label for="nickname">暱稱</label><input id="nickname" name="nickname" maxlength="80" value="${escapeHtml(state.session.nickname||"")}" placeholder="可留空，仍會保留原顯示名稱"><label class="editor-label" for="avatar-file">上傳頭像</label><div class="profile-upload"><input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp"><button type="button" class="secondary-button" id="remove-avatar">移除頭像</button></div><p class="muted">PNG、JPEG、WebP，單一檔案最多 400 MB。</p></div><div id="theme-settings"><h2>系統風格</h2><div class="theme-grid" role="group" aria-label="選擇系統風格">${themes.map(option=>`<button type="button" class="theme-card" data-theme-choice="${option.id}" aria-pressed="${option.id===theme}" style="--preview-bg:${option.bg};--preview-surface:${option.surface};--preview-ink:${option.text};--preview-accent:${option.accent}"><div class="theme-preview"><div class="theme-preview-bar"></div><div class="theme-preview-panel">704 公告預覽</div></div><strong>${option.name}</strong><small>${option.description}</small></button>`).join("")}</div></div><p id="profile-message" role="status"></p><footer class="editor-footer"><span>風格可即時預覽，按儲存才會保存到帳號。</span><button class="primary-button" id="save-profile">儲存個人化設定</button></footer></form></main>`;
  bindHeader();bindSettingsTabs();
  const form=document.querySelector("#profile-form"),file=document.querySelector("#avatar-file"),message=document.querySelector("#profile-message"),save=document.querySelector("#save-profile");
@@ -818,9 +824,9 @@ function renderPersonalization(){
  digestForm.hidden=!notificationView;
  document.querySelector('#security-center').hidden=!accountView;
  document.querySelector('.editor-heading h1').textContent=notificationView?'通知':accountView?'帳號管理':'個人化';
- document.querySelector('.editor-heading p').textContent=notificationView?'驗證必要的電子郵件信箱，並管理選用的裝置通知。':accountView?'管理暱稱、頭像與密碼。':'全站統一使用曜石工作台，可設定自己的桌布。';
+ document.querySelector('.editor-heading p').textContent=notificationView?'驗證必要的電子郵件信箱，並管理選用的裝置通知。':accountView?'管理暱稱、頭像與密碼。':'預設使用曜石工作台，可選擇其他系統風格與全站桌布。';
  save.textContent=accountView?'儲存個人資料':'儲存系統風格';
- form.querySelector('.editor-footer span').textContent=accountView?'儲存後套用頭像與暱稱。':'所有帳號一律使用曜石工作台，不受過去的風格設定影響。';
+ form.querySelector('.editor-footer span').textContent=accountView?'儲存後套用頭像與暱稱。':'風格可跨頁預覽，按儲存後，重新登入也會保留。';
 }
 function renderSiteSettings() {
   app.innerHTML = `${headerTemplate()}<main id="main-content" class="editor-shell settings-shell" tabindex="-1">${settingsTabs()}

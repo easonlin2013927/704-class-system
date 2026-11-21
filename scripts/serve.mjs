@@ -27,7 +27,7 @@ createServer(async (request, response) => {
         response.statusCode=remote.statusCode;
         response.setHeader('Cache-Control','no-store');
         for(const key of ['content-type','content-disposition'])if(remote.headers[key])response.setHeader(key,remote.headers[key]);
-        if(['/login','/account/password'].includes(apiPath)&&remote.statusCode===200){
+        if(['/login','/account/password','/auth/firebase'].includes(apiPath)&&remote.statusCode===200){
           const chunks=[];remote.on('data',chunk=>chunks.push(chunk));remote.on('end',()=>{
             const body=Buffer.concat(chunks);try{const data=JSON.parse(body);if(/^[0-9a-f]{64}$/.test(data.token||''))response.setHeader('Set-Cookie',`preview704=${data.token}; HttpOnly; SameSite=Strict; Path=/preview-api${data.remembered?'; Max-Age=34560000':''}`);}catch{}
             response.end(body);

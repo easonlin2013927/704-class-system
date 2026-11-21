@@ -210,3 +210,19 @@ node scripts/serve.mjs
 管理員可在「設定 → 網站設定」輸入內容並傳送至所有已啟用通知的裝置，包括管理員、教師、小老師及學生。表格逐人彙整多個裝置的處理狀態，並可匯出以不同底色標示狀態的 Excel；報表的備註欄提供各狀況的處理建議。推播服務接受請求不代表裝置已顯示通知。
 
 電子郵件通知固定啟用，預設學校信箱由管理員管理；使用者可在「設定 → 帳號管理」新增其他信箱並驗證。伺服器會為暫時寄送失敗的郵件排隊重試；管理員可發送測試郵件並匯出結果。裝置推播則可自行選擇。[寄件服務設定說明](docs/email-notifications.md)。
+# Google 登入（v0.30.0）
+
+Google 登入使用 Firebase Authentication。Google 已驗證信箱必須唯一對應管理員設定的鎖定信箱，且系統帳號未停用，才可登入。自行新增的信箱不能取得登入權限。原帳號密碼仍可使用。
+
+管理員在帳號信箱設定中維護鎖定地址；學生入口只接受學生，教師入口接受教師與小老師。勾選「記住我」沿用系統既有登入期限；登出會清除系統 session。
+
+此版需更新 API 及 Worker。樹莓派終端執行：
+
+```bash
+git -C /data/704-class-system/source pull --ff-only origin main
+bash /data/704-class-system/source/deploy/update-api.sh
+```
+
+腳本先在 7041 連接埠檢查新版，切換失敗會還原上一個容器；上傳目錄持續掛載在硬碟。
+
+Google 登入流程依據 [Firebase 官方文件](https://firebase.google.com/docs/auth/web/google-signin)，後端依 [ID token 驗證規則](https://firebase.google.com/docs/auth/admin/verify-id-tokens) 驗證簽章及身分。

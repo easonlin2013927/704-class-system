@@ -13,9 +13,11 @@ import {createMailTest,getMailTest,latestMailTest} from './mail-tests.mjs';
 import {migrateMailEvents,markPresence,scheduleWeeklyRanking,scheduleDigests} from './mail-events.mjs';
 import {migrateEnhancements,enhancementRoutes,authorizeEnhancedSchoolRoute,publishScheduledAnnouncements,cleanupExpiredChatFiles,serveProfileFile,permissionsFor} from './enhancements.mjs';
 import {migrateSystemCenter} from './system-center.mjs';
+import {createFirebaseAuth,migrateFirebaseAuth} from './firebase-auth.mjs';
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
+const firebaseAuth=createFirebaseAuth(db);
 const categories = new Set(["important","academic","activity","general"]);
 const themes=new Set(["dark","light","ocean","forest","rose","amber","midnight","slate","notebook","lavender","brick","teal","mono"]);
 function profile(account){return {id:account.id,role:account.role,display_name:account.display_name,must_change_password:account.must_change_password,must_add_email:account.must_add_email,must_change_email:account.must_change_email,nickname:account.nickname,theme:account.theme,avatar_url:account.avatar_url,wallpaper_url:account.wallpaper_url};}
@@ -46,6 +48,7 @@ await migrateMailboxes();
 await migrateMailDeliveries();
 await migrateMailEvents();
 await migrateSystemCenter();
+await migrateFirebaseAuth(db);
 const generatedPushKeys=webpush.generateVAPIDKeys();
 await db.query('insert into school_push_keys(id,public_key,private_key) values(1,$1,$2) on conflict(id) do nothing',[generatedPushKeys.publicKey,generatedPushKeys.privateKey]);
 const pushKeys=(await db.query('select public_key,private_key from school_push_keys where id=1')).rows[0];
@@ -79,6 +82,13 @@ const server = createServer(async (req,res) => {
  const path = new URL(req.url,"http://localhost").pathname;
  if (path === "/health" && req.method === "GET") { await db.query("select 1"); return send(200,{status:"ok"}); }
  if(req.method==="GET"&&await serveProfileFile(path,res))return;
+ if(path==='/public/auth-config'&&req.method==='GET')return send(200,firebaseAuth.config());
+ if(path==='/auth/firebase'&&req.method==='POST'){
+ const data=await body(req),binding=await firebaseAuth.login(data);
+ const token=randomBytes(32).toString('hex');
+ await db.query("insert into sessions704(token_hash,account_id,expires_at,user_agent,firebase_user_id,firebase_email) values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end,$4,$5,$6)",[digest(token),binding.account.id,data.remember===true,String(req.headers['user-agent']||'').slice(0,500),binding.userId,binding.email]);
+ return send(200,{token,remembered:data.remember===true,profile:profile(binding.account)});
+ }
  if (path === "/public/banner" && req.method === "GET") {
  const banner=(await db.query("select enabled,content from login_banner704 where id=1")).rows[0];
  const marquee=(await db.query("select enabled,content from site_marquee704 where id=1")).rows[0];
@@ -104,8 +114,9 @@ const server = createServer(async (req,res) => {
  return send(200,{token,remembered:data.remember===true,profile:profile(account)});
  }
  const token = req.headers.authorization?.replace(/^Bearer /,"") || "";
- const user = (await db.query("select a.id,a.role,a.display_name,a.must_change_password,a.must_add_email,a.must_change_email from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now() and not a.disabled",[digest(token)])).rows[0];
+ const user = (await db.query("select a.id,a.role,a.display_name,a.must_change_password,a.must_add_email,a.must_change_email,s.firebase_user_id,s.firebase_email from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now() and not a.disabled",[digest(token)])).rows[0];
  if (!user) fail(401,"登入已失效，請重新登入");
+ if(path!=='/logout')await firebaseAuth.validateLocal(user);
  user.permissions=await permissionsFor(user);
  await db.query('update sessions704 set last_seen=now(),user_agent=case when user_agent=\'\' then $2 else user_agent end where token_hash=$1',[digest(token),String(req.headers['user-agent']||'').slice(0,500)]);
  if (path === "/logout" && req.method === "POST") { await db.query("delete from sessions704 where token_hash=$1",[digest(token)]); return send(200,{ok:true}); }
@@ -116,7 +127,7 @@ const server = createServer(async (req,res) => {
  try{
  await client.query("begin");
  await client.query("lock table accounts704 in share row exclusive mode");
- const currentSession=(await client.query("select expires_at='infinity'::timestamptz as remembered from sessions704 where token_hash=$1 and account_id=$2 and expires_at>now()",[digest(token),user.id])).rows[0];if(!currentSession) fail(401,"登入已失效，請重新登入");
+ const currentSession=(await client.query("select expires_at='infinity'::timestamptz as remembered,firebase_user_id,firebase_email from sessions704 where token_hash=$1 and account_id=$2 and expires_at>now()",[digest(token),user.id])).rows[0];if(!currentSession) fail(401,"登入已失效，請重新登入");
  const account=(await client.query("select * from accounts704 where id=$1 for update",[user.id])).rows[0];
  if(!account || account.disabled) fail(401,"帳戶已失效，請重新登入");
  if(!await verify(value.current_password,account.password_hash)) fail(400,"目前密碼不正確");
@@ -124,7 +135,7 @@ const server = createServer(async (req,res) => {
  await client.query("update accounts704 set password_hash=$1,must_change_password=false where id=$2",[await hash(value.new_password),user.id]);
  await client.query("delete from sessions704 where account_id=$1",[user.id]);
  const nextToken=randomBytes(32).toString("hex");
- await client.query("insert into sessions704(token_hash,account_id,expires_at,user_agent) values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end,$4)",[digest(nextToken),user.id,currentSession.remembered,String(req.headers['user-agent']||'').slice(0,500)]);
+ await client.query("insert into sessions704(token_hash,account_id,expires_at,user_agent,firebase_user_id,firebase_email) values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end,$4,$5,$6)",[digest(nextToken),user.id,currentSession.remembered,String(req.headers['user-agent']||'').slice(0,500),currentSession.firebase_user_id,currentSession.firebase_email]);
  await client.query("commit");
  return send(200,{token:nextToken,remembered:currentSession.remembered,profile:profile({...account,must_change_password:false})});
  }catch(error){await client.query("rollback");throw error;}finally{client.release();}
