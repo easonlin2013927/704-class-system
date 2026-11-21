@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { exchangeGoogleLogin, googleLoginError, mountGoogleLogin } from './firebase-auth.js';
-import { cloud } from './cloud.js?v=0.30.0';
+import { cloud } from './cloud.js';
 
 let cleaned = 0, popup = 0;
 const auth = {};

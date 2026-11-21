@@ -17,7 +17,7 @@ async function request(path, options = {}) {
   } catch { throw new Error("無法連接公告服務，請確認網路或聯絡管理員。"); }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    if(response.status===401&&(token||path!=="/login")){token=null;window.dispatchEvent(new Event("session-expired"));}
+    if(response.status===401&&!['/login','/auth/firebase','/public/auth-config'].includes(path)){token=null;window.dispatchEvent(new Event("session-expired"));}
     if(data.code==="PASSWORD_CHANGE_REQUIRED")window.dispatchEvent(new Event("password-required"));
     throw Object.assign(new Error(data.message || "雲端操作失敗，請稍後重試。"),{code:data.code});
   }

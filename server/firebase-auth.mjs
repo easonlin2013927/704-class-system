@@ -34,11 +34,11 @@ export function createFirebaseAuth(db,config=firebaseConfig,fetchCertificates=fe
    const seconds=Math.floor(now()/1000);
    if(claims.aud!==config.projectId||claims.iss!==`https://securetoken.google.com/${config.projectId}`||typeof claims.sub!=='string'||!claims.sub||claims.sub.length>128||!Number.isFinite(claims.exp)||claims.exp<=seconds||!Number.isFinite(claims.iat)||claims.iat>seconds||!Number.isFinite(claims.auth_time)||claims.auth_time>seconds||claims.auth_time>claims.iat||claims.iat>=claims.exp)throw Error();
   }catch{fail(401,'Google 登入驗證失敗，請重新登入');}
-  if(claims.email_verified!==true||claims.firebase?.sign_in_provider!=='google.com'||!normalize(claims.email)||normalize(claims.email).length>320)fail(403,'請使用管理員指定的已驗證 Google 帳戶登入');
+  if(claims.email_verified!==true||claims.firebase?.sign_in_provider!=='google.com'||!normalize(claims.email)||normalize(claims.email).length>320)fail(403,'請使用已驗證的 Google 帳戶登入');
   return {userId:claims.sub,email:normalize(claims.email)};
  }
  async function accountFor(email){
-  const rows=(await db.query('select distinct a.* from accounts704 a join school_mailboxes m on m.account_id=a.id where m.locked and m.verified and lower(trim(m.address))=$1',[email])).rows;
+  const rows=(await db.query('select distinct a.* from accounts704 a join school_mailboxes m on m.account_id=a.id where m.verified and lower(trim(m.address))=$1',[email])).rows;
   if(rows.length!==1)fail(403,'此 Google 信箱未獲授權或對應多個帳號，請聯絡管理員');
   if(rows[0].disabled)fail(403,'帳戶已停用，請聯絡教師或管理員');
   return rows[0];

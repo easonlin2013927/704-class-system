@@ -1,4 +1,4 @@
-import {cloud} from './cloud.js?v=0.27.1';
+import {cloud} from './cloud.js';
 import {exportMailTest} from './broadcast.js?v=0.27.1';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const role={student:'學生',teacher:'教師',assistant:'小老師',admin:'管理員'};

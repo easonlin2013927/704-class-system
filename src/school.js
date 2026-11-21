@@ -1,4 +1,4 @@
-import { cloud } from './cloud.js?v=0.29.1';
+import { cloud } from './cloud.js';
 import { renderChat } from './chat.js?v=0.29.1';
 import {lineIcon,navigationIcon} from './interface-icons.js';
 let poll=null;

@@ -1,4 +1,4 @@
-import { cloud } from './cloud.js?v=0.30.0';
+import { cloud } from './cloud.js';
 
 let loading;
 function loadFirebase(config) {

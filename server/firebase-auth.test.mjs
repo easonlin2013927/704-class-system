@@ -17,10 +17,10 @@ function fixture(){
  return {auth,state};
 }
 const login={portal:'student',remember:true};
-test('signed Google token maps only to current locked verified mailbox; public config and certificate cache',async()=>{
+test('signed Google token maps only to current verified mailbox; public config and certificate cache',async()=>{
  const {auth,state}=fixture();const result=await auth.login({...login,token:jwt(),email:'forged@example.com'});
  assert.equal(result.email,'student@school.example');assert.equal(result.userId,'firebase-user');
- assert.match(state.queries[0].sql,/m\.locked and m\.verified/);assert.deepEqual(state.queries[0].args,['student@school.example']);
+ assert.match(state.queries[0].sql,/where m\.verified/);assert.doesNotMatch(state.queries[0].sql,/m\.locked/);assert.deepEqual(state.queries[0].args,['student@school.example']);
  await auth.login({...login,token:jwt()});assert.equal(state.fetches,1);assert.deepEqual(auth.config(),{firebase:{enabled:true,config}});
 });
 test('reject malformed, tampered, wrong signature and unknown key tokens',async()=>{
@@ -39,7 +39,7 @@ test('reject no match, duplicate match, disabled account and wrong portal; assis
  for(const accounts of [[],[{id:'a'},{id:'b'}],[{id:'a',disabled:true}],[{id:'a',role:'admin'}]]){const {auth,state}=fixture();state.accounts=accounts;await assert.rejects(auth.login({...login,token:jwt()}),{status:403});}
  const {auth,state}=fixture();state.accounts[0].role='assistant';assert.equal((await auth.login({portal:'teacher',token:jwt()})).account.role,'assistant');
 });
-test('Google local sessions reject removed or reassigned locked mailbox; password sessions unaffected',async()=>{
+test('Google local sessions reject removed or reassigned verified mailbox; password sessions unaffected',async()=>{
  const {auth,state}=fixture(),session={id:'account_1',firebase_user_id:'firebase-user',firebase_email:'student@school.example'};
  await auth.validateLocal(session);state.accounts=[];await assert.rejects(auth.validateLocal(session),{status:403});
  state.accounts=[{id:'other'}];await assert.rejects(auth.validateLocal(session),{status:401});await auth.validateLocal({id:'password-user'});
