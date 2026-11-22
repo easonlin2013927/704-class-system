@@ -2,13 +2,13 @@ import {mountAccountProviders} from './account-providers.js';
 import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
 import { mountGoogleLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.31.0";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.31.0';
-import {mountMailboxes} from './mailboxes.js?v=0.31.0';
-import {mountMailTest} from './mail-test.js?v=0.31.0';
-import { portals, portalRole } from "./portal.js?v=0.31.0";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.31.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.31.0';
+import { initConnectivityGuard } from "./connectivity.js?v=0.31.1";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.31.1';
+import {mountMailboxes} from './mailboxes.js?v=0.31.1';
+import {mountMailTest} from './mail-test.js?v=0.31.1';
+import { portals, portalRole } from "./portal.js?v=0.31.1";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.31.1";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.31.1';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 
 initConnectivityGuard();
@@ -319,7 +319,7 @@ function renderAccounts() {
  const refresh=async()=>{
  try{
  state.accounts=await cloud.accounts();
- list.innerHTML=state.accounts.filter(account=>{const filter=document.querySelector("#account-filter").value;return filter==="all"||(filter==="active"?!account.disabled:filter==="disabled"?account.disabled:account.role===filter);}).map(account=>`<div class="account-row" data-account-role="${account.role}"><label class="row-selector" aria-label="選取 ${escapeHtml(account.display_name)}"><input type="checkbox" data-account-select value="${account.id}"></label><div><strong>${escapeHtml(account.display_name)}</strong><small>${escapeHtml(account.email)}</small></div><div class="account-badges"><span class="role-chip">${portals[account.role].label}</span><span class="status-badge ${account.disabled?"disabled":""}">${account.disabled?"已停用":"啟用中"}</span>${account.must_change_password?'<span class="status-badge">需更換密碼</span>':""}</div><button class="secondary-button" data-edit-account="${account.id}">編輯</button>${isAdmin?`<button class="danger-button" data-remove-account="${account.id}">刪除</button>`:""}</div>`).join("")||"<p>尚無帳號。</p>";message.textContent="";updateBulkCount();
+ list.innerHTML=state.accounts.filter(account=>{const filter=document.querySelector("#account-filter").value;return filter==="all"||(filter==="active"?!account.disabled:filter==="disabled"?account.disabled:account.role===filter);}).map(account=>`<div class="account-row" data-account-role="${account.role}"><label class="row-selector" aria-label="選取 ${escapeHtml(account.display_name)}"><input type="checkbox" data-account-select value="${account.id}"></label><div><strong>${escapeHtml(account.display_name)}</strong><small>${escapeHtml(account.email)}</small></div><div class="account-badges"><span class="role-chip">${portals[account.role].label}</span><span class="status-badge ${account.disabled?"disabled":""}">${account.disabled?"已停用":"啟用中"}</span>${account.must_change_password?'<span class="status-badge">需更換密碼</span>':""}</div><div class="account-actions"><button class="secondary-button" data-edit-account="${account.id}">編輯</button>${isAdmin?`<button class="danger-button" data-remove-account="${account.id}">刪除</button>`:""}</div></div>`).join("")||"<p>尚無帳號。</p>";message.textContent="";updateBulkCount();
  }catch(error){message.textContent=error.message;}
  };
  document.querySelector("#account-filter").addEventListener("change",refresh);

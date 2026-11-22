@@ -297,3 +297,14 @@
 .google-auth-button.google-auth-button:hover{background:#f8fafd!important;color:#1f1f1f!important}.google-auth-button img{width:20px;height:20px;flex:0 0 20px;object-fit:contain}
 
 .provider-row button,[data-provider-confirm],[data-provider-cancel]{min-height:44px}
+
+/* Keep account selection, details, badges and actions in separate columns. */
+#accounts-list .account-row{grid-template-columns:24px minmax(0,1fr) minmax(0,1fr) auto}
+#accounts-list .account-actions{display:flex;gap:8px;align-items:center}
+#accounts-list .account-actions>button{grid-column:auto;grid-row:auto;box-sizing:border-box;flex:0 0 80px;width:80px;min-width:80px;height:44px;padding:0 12px;white-space:nowrap}
+@media(max-width:760px){
+ #accounts-list .account-row{grid-template-columns:24px minmax(0,1fr);gap:10px}
+ #accounts-list .account-row>.row-selector{grid-column:1;grid-row:1}
+ #accounts-list .account-row>div{grid-column:2}
+ #accounts-list .account-actions{justify-content:flex-end}
+}
