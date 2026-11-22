@@ -144,8 +144,9 @@ const server = createServer(async (req,res) => {
  if(user.must_change_password) fail(403,"請先變更密碼","PASSWORD_CHANGE_REQUIRED");
  if((user.must_add_email||user.must_change_email)&&!/^\/school\/(mailboxes(?:\/[0-9a-f-]{36})?|mailbox-request|mailbox-confirm)$/.test(path)&&!(user.role==='admin'&&path==='/school/mail-admin/'+user.id))fail(403,'請先完成管理員要求的電子郵件設定','EMAIL_CHANGE_REQUIRED');
  if(path==='/account/providers'&&req.method==='GET')return send(200,await firebaseAuth.providers(user));
- if(path==='/account/providers/google'&&req.method==='POST')return send(201,await firebaseAuth.link(user,await body(req)));
- if(path==='/account/providers/google'&&req.method==='DELETE')return send(200,await firebaseAuth.unlink(user,await body(req)));
+ const providerPath=path.match(/^\/account\/providers\/(google|github)$/);
+ if(providerPath&&req.method==='POST')return send(201,await firebaseAuth.link(user,await body(req),providerPath[1]));
+ if(providerPath&&req.method==='DELETE')return send(200,await firebaseAuth.unlink(user,await body(req),providerPath[1]));
  if(path==='/school/mail-address'&&req.method==='GET')return send(200,await mailAddress(user));
  if(path==='/school/presence'&&req.method==='POST')return send(200,await markPresence(user));
   if(path==='/school/mail-status'&&req.method==='GET'){if(!user.permissions.site_settings)fail(403,'此帳號沒有網站設定權限');return send(200,await mailStatus({...user,role:'admin'}));}

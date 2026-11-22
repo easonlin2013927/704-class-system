@@ -232,3 +232,6 @@ bash /data/704-class-system/source/deploy/update-api.sh
 腳本先在 7041 連接埠檢查新版，切換失敗會還原上一個容器；上傳目錄持續掛載在硬碟。
 
 Google 登入流程依據 [Firebase 官方文件](https://firebase.google.com/docs/auth/web/google-signin)，後端依 [ID token 驗證規則](https://firebase.google.com/docs/auth/admin/verify-id-tokens) 驗證簽章及身分。
+## GitHub 登入（v0.32.0）
+
+登入頁支援 Google 與 GitHub。使用者須先以系統帳密登入，在「設定／帳號管理／登入服務」完成綁定；未綁定的外部帳戶不能登入。每個系統帳號可各綁定一個 Google 與 GitHub，通知信箱不受影響。GitHub 未公開信箱仍可使用。詳見 [登入服務操作說明](docs/wiki/Account-Login.md)。本版需部署 API 與 Worker；GitHub Client Secret 只設定於 Firebase，不加入程式碼或 API 環境。

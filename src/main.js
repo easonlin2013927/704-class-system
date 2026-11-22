@@ -1,14 +1,14 @@
 import {mountAccountProviders} from './account-providers.js';
 import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
-import { mountGoogleLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.31.1";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.31.1';
-import {mountMailboxes} from './mailboxes.js?v=0.31.1';
-import {mountMailTest} from './mail-test.js?v=0.31.1';
-import { portals, portalRole } from "./portal.js?v=0.31.1";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.31.1";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.31.1';
+import { mountProviderLogin } from "./firebase-auth.js";
+import { initConnectivityGuard } from "./connectivity.js?v=0.32.0";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.32.0';
+import {mountMailboxes} from './mailboxes.js?v=0.32.0';
+import {mountMailTest} from './mail-test.js?v=0.32.0';
+import { portals, portalRole } from "./portal.js?v=0.32.0";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.32.0";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.32.0';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 
 initConnectivityGuard();
@@ -200,7 +200,8 @@ function renderLogin() {
           <h1>${portal.title}</h1>
           <p class="muted">${portal.description}</p>
           <button type="button" id="google-login" class="secondary-button wide" hidden>使用 Google 登入</button>
-          <p class="helper">首次使用請以帳號密碼登入，再到「設定／帳號管理／登入服務」綁定 Google。</p>
+          <button type="button" id="github-login" class="secondary-button wide" hidden>使用 GitHub 登入</button>
+          <p class="helper">首次使用請以帳號密碼登入，再到「設定／帳號管理／登入服務」綁定 Google 或 GitHub。</p>
           <form id="login-form">
             <label>帳號<input name="account" autocomplete="username" placeholder="請輸入帳號" type="text" required></label>
             <label>密碼<input name="password" type="password" autocomplete="current-password" placeholder="請輸入密碼"></label>
@@ -214,7 +215,8 @@ function renderLogin() {
       </div><footer class="login-footnote">704 班務手冊 <span>讓每一則消息，清楚抵達。</span></footer>
     </main>`;
 
-  mountGoogleLogin(document.querySelector('#google-login'), activeRole, finishLogin, error=>{state.session=null;cloud.logout();toast(error.message,'error');}).catch(error=>toast(error.message,'error'));
+  const authConfig=cloud.authConfig();
+  for(const provider of ['google','github'])mountProviderLogin(document.querySelector('#'+provider+'-login'), activeRole, finishLogin, error=>{state.session=null;cloud.logout();toast(error.message,'error');},provider,authConfig).catch(error=>toast(error.message,'error'));
   document.querySelector("#login-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);

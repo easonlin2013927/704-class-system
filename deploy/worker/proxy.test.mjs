@@ -5,8 +5,8 @@ const origin='https://easonlin2013927.github.io',base='https://example.workers.d
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json','Cache-Control':'public, max-age=3600','Set-Cookie':'never=forward'}});
 
 test('provider management forwards local authorization without replacing the session cookie',async()=>{
- for(const method of ['GET','POST','DELETE']){
-  const path=method==='GET'?'/account/providers':'/account/providers/google';
+ for(const provider of ['google','github'])for(const method of ['GET','POST','DELETE']){
+  const path=method==='GET'?'/account/providers':'/account/providers/'+provider;
   const result=await proxyRequest(new Request(base+path,{method,headers:{Origin:origin,Authorization:'Bearer local-session','Content-Type':'application/json'},...(method==='GET'?{}:{body:JSON.stringify({token:'google-token',current_password:'fixture-password'})})}),{fetchUpstream:async(url,options)=>{assert.equal(new URL(url).pathname,path);assert.equal(options.headers.get('Authorization'),'Bearer local-session');return json({ok:true});}});
   assert.equal(result.status,200);assert.equal(result.headers.get('Set-Cookie'),null);
  }

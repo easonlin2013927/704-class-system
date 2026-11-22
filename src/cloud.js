@@ -39,11 +39,11 @@ export const cloud = {
   },
   authConfig(){return request('/public/auth-config');},
   providers(){return request('/account/providers');},
-  bindGoogle(value){return request('/account/providers/google',{method:'POST',body:JSON.stringify(value)});},
-  unlinkGoogle(value){return request('/account/providers/google',{method:'DELETE',body:JSON.stringify(value)});},
-  async loginFirebase(firebaseToken,portal,remember=false){
+  bindProvider(provider,value){return request('/account/providers/'+encodeURIComponent(provider),{method:'POST',body:JSON.stringify(value)});},
+  unlinkProvider(provider,value){return request('/account/providers/'+encodeURIComponent(provider),{method:'DELETE',body:JSON.stringify(value)});},
+  async loginFirebase(firebaseToken,portal,remember=false,provider='google'){
     token=null;
-    const result=await request('/auth/firebase',{method:'POST',body:JSON.stringify({token:firebaseToken,portal,remember})});
+    const result=await request('/auth/firebase',{method:'POST',body:JSON.stringify({token:firebaseToken,portal,remember,provider})});
     token=result.token;
     return result.profile;
   },
