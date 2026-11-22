@@ -17,6 +17,11 @@ function fixture(){
  return {auth,state};
 }
 const login={portal:'student',remember:true};
+test('missing Web configuration disables Google login without exposing deployment values',async()=>{
+ const auth=createFirebaseAuth({}, {projectId:'fixture',apiKey:''});
+ assert.deepEqual(auth.config(),{firebase:{enabled:false,config:null}});
+ await assert.rejects(auth.login({...login,token:jwt()}),{status:503});
+});
 test('signed Google token maps only to current verified mailbox; public config and certificate cache',async()=>{
  const {auth,state}=fixture();const result=await auth.login({...login,token:jwt(),email:'forged@example.com'});
  assert.equal(result.email,'student@school.example');assert.equal(result.userId,'firebase-user');

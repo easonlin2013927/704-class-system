@@ -41,3 +41,5 @@ export async function proxyRequest(request,{fetchUpstream=fetch}={}){
  finally{clearTimeout(timeout);}
 }
 export default {fetch(request){return proxyRequest(request);}};
+
+export function isAllowedApiPath(path){return paths.test(path);}

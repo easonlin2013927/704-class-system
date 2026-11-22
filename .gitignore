@@ -11,6 +11,7 @@ shots/
 .env
 .env.*
 !.env.example
+const firebaseConfig.txt
 
 .projectmem/events.jsonl
 .projectmem/watch.pid

@@ -22,6 +22,9 @@ await rm("dist", { recursive: true, force: true });
 await mkdir("dist/src", { recursive: true });
 await mkdir("dist/assets", { recursive: true });
 await mkdir("dist/downloads", { recursive: true });
+await mkdir("dist/vendor", { recursive: true });
+await cp("node_modules/dompurify/dist/purify.es.mjs", "dist/vendor/dompurify.js");
+await cp("node_modules/dompurify/LICENSE", "dist/vendor/DOMPurify-LICENSE");
 
 await build({
   entryPoints: [resolve("src/main.js")],

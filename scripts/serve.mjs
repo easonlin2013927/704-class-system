@@ -2,7 +2,8 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { request as httpsRequest } from "node:https";
-import { extname, join, normalize } from "node:path";
+import { extname, join } from "node:path";
+import {previewApiPath,previewFilePath} from './preview-security.mjs';
 
 const root = process.env.PREVIEW_SOURCE === "1" ? process.cwd() : join(process.cwd(), "dist");
 const mime = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json" };
@@ -18,12 +19,13 @@ createServer(async (request, response) => {
       if (request.headers.origin && !['http://127.0.0.1:4173','http://localhost:4173'].includes(request.headers.origin)) {
         response.writeHead(403);response.end('Origin not allowed');return;
       }
-      const apiPath=pathname.slice('/preview-api'.length)+localUrl.search;
+      const apiPath=previewApiPath(pathname,localUrl.search);
+      if(!apiPath){response.writeHead(404);response.end('Not found');return;}
       const headers={};
       for(const key of ['authorization','content-type']) if(request.headers[key]) headers[key]=request.headers[key];
       const session=(request.headers.cookie||'').match(/(?:^|;\s*)preview704=([0-9a-f]{64})(?:;|$)/)?.[1];
       if(!headers.authorization&&session) headers.authorization='Bearer '+session;
-      const upstream=httpsRequest('https://704-announcement-api.easonlin2013927.workers.dev'+apiPath,{method:request.method,headers,timeout:30000},remote=>{
+      const upstream=httpsRequest({protocol:'https:',hostname:'704-announcement-api.easonlin2013927.workers.dev',port:443,path:apiPath,method:request.method,headers,timeout:30000},remote=>{
         response.statusCode=remote.statusCode;
         response.setHeader('Cache-Control','no-store');
         for(const key of ['content-type','content-disposition'])if(remote.headers[key])response.setHeader(key,remote.headers[key]);
@@ -45,11 +47,14 @@ createServer(async (request, response) => {
       response.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store'});
       response.end('export const config = {url: location.origin + "/preview-api"};');return;
     }
-    if(pathname.split('/').some(part=>part.startsWith('.'))||!(/^\/(?:src\/|student\/|teacher\/|admin\/|assets\/|downloads\/|index\.html$)/.test(pathname)||pathname==='/')){
+    if(pathname==='/vendor/dompurify.js'){
+      response.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8'});
+      createReadStream(join(process.cwd(),'node_modules/dompurify/dist/purify.es.mjs')).pipe(response);return;
+    }
+    let file=previewFilePath(root,pathname);
+    if(!file){
       response.writeHead(404);response.end('Not found');return;
     }
-    const safePath = normalize(pathname).replace(/^(\.\.[/\\])+/, "");
-    let file = join(root, safePath === "/" ? "index.html" : safePath);
     if ((await stat(file)).isDirectory()) file = join(file, "index.html");
     response.writeHead(200, { "Content-Type": mime[extname(file)] || "application/octet-stream" });
     createReadStream(file).pipe(response);

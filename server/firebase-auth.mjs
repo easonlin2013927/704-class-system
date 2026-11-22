@@ -44,8 +44,9 @@ export function createFirebaseAuth(db,config=firebaseConfig,fetchCertificates=fe
   return rows[0];
  }
  return {
-  config:()=>({firebase:{enabled:true,config}}),
+  config:()=>({firebase:{enabled:Boolean(config.apiKey),config:config.apiKey?config:null}}),
   async login(data){
+   if(!config.apiKey)fail(503,'Google 登入尚未完成伺服器設定，請先使用帳號密碼');
    if(!data||typeof data.token!=='string'||data.token.length>16000||!['student','teacher','admin'].includes(data.portal)||(data.remember!==undefined&&typeof data.remember!=='boolean'))fail(400,'Google 登入資料格式錯誤');
    const binding=await verifyToken(data.token),account=await accountFor(binding.email);
    if(data.portal!==(account.role==='assistant'?'teacher':account.role))fail(403,'帳號不屬於此登入入口');

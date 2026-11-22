@@ -1,12 +1,13 @@
+import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
 import { mountGoogleLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.30.4";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.30.4';
-import {mountMailboxes} from './mailboxes.js?v=0.30.4';
-import {mountMailTest} from './mail-test.js?v=0.30.4';
-import { portals, portalRole } from "./portal.js?v=0.30.4";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.30.4";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.30.4';
+import { initConnectivityGuard } from "./connectivity.js?v=0.30.5";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.30.5';
+import {mountMailboxes} from './mailboxes.js?v=0.30.5';
+import {mountMailTest} from './mail-test.js?v=0.30.5';
+import { portals, portalRole } from "./portal.js?v=0.30.5";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.30.5";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.30.5';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 
 initConnectivityGuard();
@@ -81,72 +82,6 @@ function escapeHtml(value = "") {
   }[char]));
 }
 
-function stripHtml(html) {
-  const node = document.createElement("div");
-  node.innerHTML = html;
-  return node.textContent || "";
-}
-
-function sanitizeHtml(html = "") {
-  const template = document.createElement("template");
-  template.innerHTML = html;
-  const allowed = new Set(["P", "BR", "STRONG", "B", "EM", "I", "U", "MARK", "UL", "OL", "LI", "H2", "H3", "BLOCKQUOTE", "A", "SPAN", "FONT", "IMG"]);
-
-  template.content.querySelectorAll("*").forEach((element) => {
-    if (["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED"].includes(element.tagName)) {
-      element.remove();
-      return;
-    }
-    if (!allowed.has(element.tagName)) {
-      element.replaceWith(...element.childNodes);
-      return;
-    }
-
-    const imageSource = element.tagName === "IMG" ? element.getAttribute("src") : null;
-    const imageAlt = element.getAttribute("alt") || "公告圖片";
-    const highlight = element.style.backgroundColor;
-    const href = element.tagName === "A" ? element.getAttribute("href") : null;
-    [...element.attributes].forEach((attribute) => element.removeAttribute(attribute.name));
-
-    if (element.tagName === "IMG") {
-      if (!imageSource || imageSource.length > 100000 || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(imageSource)) { element.remove(); return; }
-      element.setAttribute("src", imageSource);
-      element.setAttribute("alt", imageAlt);
-      element.setAttribute("loading", "lazy");
-    }
-
-    if (highlight) element.style.backgroundColor = highlight;
-    if (element.tagName === "A" && href) {
-      try {
-        const url = new URL(href, window.location.origin);
-        if (["http:", "https:", "mailto:"].includes(url.protocol)) {
-          element.setAttribute("href", url.href);
-          element.setAttribute("target", "_blank");
-          element.setAttribute("rel", "noopener noreferrer");
-        }
-      } catch {
-        // Invalid links remain plain text.
-      }
-    }
-  });
-  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
-  const textNodes = [];
-  while (walker.nextNode()) if (!walker.currentNode.parentElement?.closest("a")) textNodes.push(walker.currentNode);
-  for (const node of textNodes) {
-    const pattern = /https?:\/\/[^\s<>"'，。！？；、（）【】]+/g;
-    const fragment = document.createDocumentFragment();
-    let last = 0, match;
-    while ((match = pattern.exec(node.textContent))) {
-      const url = match[0].replace(/[.,!?;:)\]}]+$/, "");
-      fragment.append(document.createTextNode(node.textContent.slice(last, match.index)));
-      const link = document.createElement("a");
-      link.href = url; link.textContent = url; link.target = "_blank"; link.rel = "noopener noreferrer";
-      fragment.append(link); last = match.index + url.length;
-    }
-    if (last) { fragment.append(document.createTextNode(node.textContent.slice(last))); node.replaceWith(fragment); }
-  }
-  return template.innerHTML;
-}
 
 function formatDate(value, detailed = false) {
   const options = detailed

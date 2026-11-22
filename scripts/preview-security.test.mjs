@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {resolve} from 'node:path';
+import {previewApiPath,previewFilePath} from './preview-security.mjs';
+assert.equal(previewApiPath('/preview-api/login'),'/login');
+assert.equal(previewApiPath('/preview-api/school/rooms','?search=test'),'/school/rooms?search=test');
+for(const path of ['/preview-api//evil.example','/preview-api/https://evil.example','/preview-api/health\\@evil.example','/preview-api/../../.env','/preview-api/unknown','/preview-api/%2f%2fevil'])assert.equal(previewApiPath(path),null,path);
+assert.equal(previewApiPath('/preview-api/health','//evil.example'),null);
+const root=resolve('dist');
+assert.equal(previewFilePath(root,'/src/main.js'),resolve(root,'src/main.js'));
+assert.equal(previewFilePath(root,'/'),resolve(root,'index.html'));
+for(const path of ['/src/../../.env','/src/..\\..\\.env','/src/a.js:secret','/src/\0secret','/.env','/server/firebase-config.mjs'])assert.equal(previewFilePath(root,path),null,path);
+console.log('Preview proxy route and file containment checks passed');
