@@ -8,6 +8,7 @@ test -f "$ENV_FILE"
 test -d "$ROOT/uploads"
 if ! grep -q '^FIREBASE_API_KEY=.' "$ENV_FILE"; then
   # Migrate the existing public Web key without printing it or copying other environment values.
+  printf '\n' >> "$ENV_FILE"
   docker exec api704 node --input-type=module -e '
     import {firebaseConfig} from "./firebase-config.mjs";
     const key=firebaseConfig.apiKey;

@@ -65,4 +65,3 @@ export function sanitizeHtml(html = "") {
   }
   return DOMPurify.sanitize(template.innerHTML,{ALLOWED_TAGS:[...allowed],ALLOWED_ATTR:['href','target','rel','src','alt','loading','style']});
 }
-
