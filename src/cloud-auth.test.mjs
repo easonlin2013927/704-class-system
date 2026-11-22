@@ -21,4 +21,7 @@ assert.ok(!events.includes('session-expired'));
 rejectLogin=false;
 assert.deepEqual(await cloud.loginFirebase('valid','student'),{id:'student'});
 assert.deepEqual(await cloud.school('permissions'),{ok:true});
+await cloud.bindGoogle({token:'google-token',current_password:'fixture-password'});
+await cloud.unlinkGoogle({current_password:'fixture-password'});
+assert.deepEqual(await cloud.school('permissions'),{ok:true},'Provider management must retain the local bearer token');
 console.log('Shared auth module and Google exchange regression checks passed');

@@ -86,7 +86,7 @@ const server = createServer(async (req,res) => {
  if(path==='/auth/firebase'&&req.method==='POST'){
  const data=await body(req),binding=await firebaseAuth.login(data);
  const token=randomBytes(32).toString('hex');
- await db.query("insert into sessions704(token_hash,account_id,expires_at,user_agent,firebase_user_id,firebase_email) values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end,$4,$5,$6)",[digest(token),binding.account.id,data.remember===true,String(req.headers['user-agent']||'').slice(0,500),binding.userId,binding.email]);
+ await db.query("insert into sessions704(token_hash,account_id,expires_at,user_agent,firebase_user_id,firebase_email,firebase_binding_id) values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end,$4,$5,$6,$7)",[digest(token),binding.account.id,data.remember===true,String(req.headers['user-agent']||'').slice(0,500),binding.userId,binding.email,binding.bindingId]);
  return send(200,{token,remembered:data.remember===true,profile:profile(binding.account)});
  }
  if (path === "/public/banner" && req.method === "GET") {
@@ -114,7 +114,7 @@ const server = createServer(async (req,res) => {
  return send(200,{token,remembered:data.remember===true,profile:profile(account)});
  }
  const token = req.headers.authorization?.replace(/^Bearer /,"") || "";
- const user = (await db.query("select a.id,a.role,a.display_name,a.must_change_password,a.must_add_email,a.must_change_email,s.firebase_user_id,s.firebase_email from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now() and not a.disabled",[digest(token)])).rows[0];
+ const user = (await db.query("select a.id,a.role,a.display_name,a.must_change_password,a.must_add_email,a.must_change_email,s.firebase_user_id,s.firebase_email,s.firebase_binding_id from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now() and not a.disabled",[digest(token)])).rows[0];
  if (!user) fail(401,"登入已失效，請重新登入");
  if(path!=='/logout')await firebaseAuth.validateLocal(user);
  user.permissions=await permissionsFor(user);
@@ -127,7 +127,7 @@ const server = createServer(async (req,res) => {
  try{
  await client.query("begin");
  await client.query("lock table accounts704 in share row exclusive mode");
- const currentSession=(await client.query("select expires_at='infinity'::timestamptz as remembered,firebase_user_id,firebase_email from sessions704 where token_hash=$1 and account_id=$2 and expires_at>now()",[digest(token),user.id])).rows[0];if(!currentSession) fail(401,"登入已失效，請重新登入");
+ const currentSession=(await client.query("select expires_at='infinity'::timestamptz as remembered,firebase_user_id,firebase_email,firebase_binding_id from sessions704 where token_hash=$1 and account_id=$2 and expires_at>now()",[digest(token),user.id])).rows[0];if(!currentSession) fail(401,"登入已失效，請重新登入");
  const account=(await client.query("select * from accounts704 where id=$1 for update",[user.id])).rows[0];
  if(!account || account.disabled) fail(401,"帳戶已失效，請重新登入");
  if(!await verify(value.current_password,account.password_hash)) fail(400,"目前密碼不正確");
@@ -135,7 +135,7 @@ const server = createServer(async (req,res) => {
  await client.query("update accounts704 set password_hash=$1,must_change_password=false where id=$2",[await hash(value.new_password),user.id]);
  await client.query("delete from sessions704 where account_id=$1",[user.id]);
  const nextToken=randomBytes(32).toString("hex");
- await client.query("insert into sessions704(token_hash,account_id,expires_at,user_agent,firebase_user_id,firebase_email) values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end,$4,$5,$6)",[digest(nextToken),user.id,currentSession.remembered,String(req.headers['user-agent']||'').slice(0,500),currentSession.firebase_user_id,currentSession.firebase_email]);
+ await client.query("insert into sessions704(token_hash,account_id,expires_at,user_agent,firebase_user_id,firebase_email,firebase_binding_id) values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end,$4,$5,$6,$7)",[digest(nextToken),user.id,currentSession.remembered,String(req.headers['user-agent']||'').slice(0,500),currentSession.firebase_user_id,currentSession.firebase_email,currentSession.firebase_binding_id]);
  await client.query("commit");
  return send(200,{token:nextToken,remembered:currentSession.remembered,profile:profile({...account,must_change_password:false})});
  }catch(error){await client.query("rollback");throw error;}finally{client.release();}
@@ -143,6 +143,9 @@ const server = createServer(async (req,res) => {
  if(path==="/me"&&req.method==="GET")return send(200,profile((await db.query("select * from accounts704 where id=$1",[user.id])).rows[0]));
  if(user.must_change_password) fail(403,"請先變更密碼","PASSWORD_CHANGE_REQUIRED");
  if((user.must_add_email||user.must_change_email)&&!/^\/school\/(mailboxes(?:\/[0-9a-f-]{36})?|mailbox-request|mailbox-confirm)$/.test(path)&&!(user.role==='admin'&&path==='/school/mail-admin/'+user.id))fail(403,'請先完成管理員要求的電子郵件設定','EMAIL_CHANGE_REQUIRED');
+ if(path==='/account/providers'&&req.method==='GET')return send(200,await firebaseAuth.providers(user));
+ if(path==='/account/providers/google'&&req.method==='POST')return send(201,await firebaseAuth.link(user,await body(req)));
+ if(path==='/account/providers/google'&&req.method==='DELETE')return send(200,await firebaseAuth.unlink(user,await body(req)));
  if(path==='/school/mail-address'&&req.method==='GET')return send(200,await mailAddress(user));
  if(path==='/school/presence'&&req.method==='POST')return send(200,await markPresence(user));
   if(path==='/school/mail-status'&&req.method==='GET'){if(!user.permissions.site_settings)fail(403,'此帳號沒有網站設定權限');return send(200,await mailStatus({...user,role:'admin'}));}

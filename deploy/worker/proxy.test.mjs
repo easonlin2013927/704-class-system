@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import {proxyRequest} from './proxy.mjs';
 const origin='https://easonlin2013927.github.io',base='https://example.workers.dev';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json','Cache-Control':'public, max-age=3600','Set-Cookie':'never=forward'}});
+
+test('provider management forwards local authorization without replacing the session cookie',async()=>{
+ for(const method of ['GET','POST','DELETE']){
+  const path=method==='GET'?'/account/providers':'/account/providers/google';
+  const result=await proxyRequest(new Request(base+path,{method,headers:{Origin:origin,Authorization:'Bearer local-session','Content-Type':'application/json'},...(method==='GET'?{}:{body:JSON.stringify({token:'google-token',current_password:'fixture-password'})})}),{fetchUpstream:async(url,options)=>{assert.equal(new URL(url).pathname,path);assert.equal(options.headers.get('Authorization'),'Bearer local-session');return json({ok:true});}});
+  assert.equal(result.status,200);assert.equal(result.headers.get('Set-Cookie'),null);
+ }
+ assert.equal((await proxyRequest(new Request(base+'/account/providers/unsupported'))).status,404);
+});
 test('preflight is local and permits credentials only for the exact origin',async()=>{
  let hits=0;const request=new Request(base+'/login',{method:'OPTIONS',headers:{Origin:origin}});
  const r=await proxyRequest(request,{fetchUpstream:()=>{hits++;throw Error('unexpected');}});

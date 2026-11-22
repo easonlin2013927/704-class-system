@@ -38,6 +38,9 @@ export const cloud = {
     return {access,preferences,mailboxes,announcements,countdowns};
   },
   authConfig(){return request('/public/auth-config');},
+  providers(){return request('/account/providers');},
+  bindGoogle(value){return request('/account/providers/google',{method:'POST',body:JSON.stringify(value)});},
+  unlinkGoogle(value){return request('/account/providers/google',{method:'DELETE',body:JSON.stringify(value)});},
   async loginFirebase(firebaseToken,portal,remember=false){
     token=null;
     const result=await request('/auth/firebase',{method:'POST',body:JSON.stringify({token:firebaseToken,portal,remember})});

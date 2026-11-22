@@ -1,13 +1,14 @@
+import {mountAccountProviders} from './account-providers.js';
 import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
 import { mountGoogleLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.30.5";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.30.5';
-import {mountMailboxes} from './mailboxes.js?v=0.30.5';
-import {mountMailTest} from './mail-test.js?v=0.30.5';
-import { portals, portalRole } from "./portal.js?v=0.30.5";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.30.5";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.30.5';
+import { initConnectivityGuard } from "./connectivity.js?v=0.31.0";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.31.0';
+import {mountMailboxes} from './mailboxes.js?v=0.31.0';
+import {mountMailTest} from './mail-test.js?v=0.31.0';
+import { portals, portalRole } from "./portal.js?v=0.31.0";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.31.0";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.31.0';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 
 initConnectivityGuard();
@@ -199,6 +200,7 @@ function renderLogin() {
           <h1>${portal.title}</h1>
           <p class="muted">${portal.description}</p>
           <button type="button" id="google-login" class="secondary-button wide" hidden>使用 Google 登入</button>
+          <p class="helper">首次使用請以帳號密碼登入，再到「設定／帳號管理／登入服務」綁定 Google。</p>
           <form id="login-form">
             <label>帳號<input name="account" autocomplete="username" placeholder="請輸入帳號" type="text" required></label>
             <label>密碼<input name="password" type="password" autocomplete="current-password" placeholder="請輸入密碼"></label>
@@ -729,6 +731,9 @@ function bindSettingsTabs(){document.querySelectorAll("[data-settings-tab]").for
 function renderSettings(){if(state.settingsTab==="site"&&(state.session.role==='teacher'||state.session.permissions?.site_settings))return renderSiteSettings();if(state.settingsTab==='account')return renderStudentAccount();return renderPersonalization();}
 function renderStudentAccount(){
  renderPersonalization();
+ const providerAccountId=state.session.id;
+ document.querySelector('.editor-heading').insertAdjacentHTML('afterend','<section id="account-providers" class="editor-card"></section>');
+ mountAccountProviders(document.querySelector('#account-providers'),()=>{if(state.session?.id!==providerAccountId)return;cloud.logout();state.session=null;render();});
  document.querySelector('.editor-heading h1').textContent='帳號管理';
  const form=document.querySelector('#profile-form');
  form.insertAdjacentHTML('afterend','<section id="personal-mailboxes" class="editor-card"></section>');

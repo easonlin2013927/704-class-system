@@ -26,4 +26,7 @@ cloud.authConfig = async () => ({firebase:{enabled:false}});
 const button = {isConnected:true, hidden:true};
 await mountGoogleLogin(button, 'admin', assert.fail, assert.fail);
 assert.equal(button.hidden, true);
+cloud.authConfig=async()=>({firebase:{enabled:true,config:{projectId:'old-backend'}}});
+await mountGoogleLogin(button,'student',assert.fail,assert.fail);
+assert.equal(button.hidden,true,'Old email-based backend must not show the provider login button');
 console.log('Firebase frontend: token exchange, denied account, popup cancellation, cleanup and disabled config passed');
