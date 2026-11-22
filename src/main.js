@@ -1,12 +1,12 @@
 import { cloud } from "./cloud.js";
 import { mountGoogleLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.30.3";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.30.3';
-import {mountMailboxes} from './mailboxes.js?v=0.30.3';
-import {mountMailTest} from './mail-test.js?v=0.30.3';
-import { portals, portalRole } from "./portal.js?v=0.30.3";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.30.3";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.30.3';
+import { initConnectivityGuard } from "./connectivity.js?v=0.30.4";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.30.4';
+import {mountMailboxes} from './mailboxes.js?v=0.30.4';
+import {mountMailTest} from './mail-test.js?v=0.30.4';
+import { portals, portalRole } from "./portal.js?v=0.30.4";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.30.4";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.30.4';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 
 initConnectivityGuard();

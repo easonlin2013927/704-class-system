@@ -102,14 +102,15 @@
 [data-theme="dark"] .nav-more>button{display:none}
 [data-theme="dark"] .nav-more[open]>.nav-secondary{display:grid;margin-top:8px}
 
-/* Quiet line-icon motion: delayed by JS, plays once. */
-[data-theme="dark"] .is-icon-animating .line-icon .icon-motion{animation:line-icon-shift 480ms cubic-bezier(.2,.8,.2,1) both}
-[data-theme="dark"] .is-icon-animating .line-icon-settings .icon-motion{transform-origin:center;animation:line-icon-turn 520ms cubic-bezier(.2,.8,.2,1) both}
-[data-theme="dark"] .is-icon-animating .line-icon-announcement .icon-motion,[data-theme="dark"] .is-icon-animating .line-icon-inbox .icon-motion{animation:line-icon-draw 520ms ease both}
-[data-theme="dark"] .line-icon .icon-motion{transform-box:fill-box;transform-origin:center}
-@keyframes line-icon-shift{0%,100%{transform:translate(0)}45%{transform:translate(1.5px,-1px)}}
-@keyframes line-icon-turn{0%,100%{transform:rotate(0)}50%{transform:rotate(18deg)}}
-@keyframes line-icon-draw{0%{opacity:.2;transform:translateX(-2px)}70%,100%{opacity:1;transform:translateX(0)}}
+/* One quiet gesture; structural paths stay connected and every icon returns home. */
+.line-icon{display:block;overflow:visible}
+.is-icon-animating .line-icon{animation:nav-icon-lift 400ms cubic-bezier(.22,.61,.36,1)}
+.is-icon-animating :is(.line-icon-today,.line-icon-records,.line-icon-chat,.line-icon-safety,.line-icon-settings){animation:none}
+.is-icon-animating :is(.line-icon-today,.line-icon-records,.line-icon-chat,.line-icon-safety) .icon-motion{animation:nav-icon-ink 400ms ease}
+.is-icon-animating .line-icon-settings .icon-motion{transform-box:view-box;transform-origin:12px 12px;animation:nav-icon-turn 400ms cubic-bezier(.22,.61,.36,1)}
+@keyframes nav-icon-lift{0%,100%{transform:translateY(0)}45%{transform:translateY(-1px)}}
+@keyframes nav-icon-ink{0%,100%{opacity:1}40%{opacity:.5}}
+@keyframes nav-icon-turn{0%,100%{transform:rotate(0)}45%{transform:rotate(12deg)}}
 
 /* Content rhythm */
 [data-theme="dark"] .page-shell,[data-theme="dark"] .article-shell,[data-theme="dark"] .editor-shell{width:min(var(--content),calc(100% - 64px))}
@@ -284,6 +285,6 @@
 }
 
 @media(prefers-reduced-motion:reduce){
-  [data-theme="dark"] .line-icon .icon-motion{animation:none!important;transform:none!important}
+  .line-icon,.line-icon .icon-motion{animation:none!important;transform:none!important}
   [data-theme="dark"] .announcement-card:hover,[data-theme="dark"] .today-item:hover,[data-theme="dark"] .theme-card:hover{transform:none!important;padding-left:inherit}
 }

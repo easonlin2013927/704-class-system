@@ -27,14 +27,28 @@ export function lineIcon(name,size=20){
   return `<svg class="line-icon line-icon-${name}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${path}</svg>`;
 }
 
+const motionBound=new WeakSet();
 export function bindIconMotion(root=document){
   root.querySelectorAll('.school-nav button,.nav-more>summary,.animated-icon,.header-action').forEach(element=>{
-    let timer=0;
-    const play=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(element.classList.contains('is-icon-animating'))return;element.classList.add('is-icon-animating');setTimeout(()=>element.classList.remove('is-icon-animating'),560);},110);};
-    const cancel=()=>clearTimeout(timer);
-    element.addEventListener('pointerenter',play);
+    if(motionBound.has(element))return;
+    motionBound.add(element);
+    let timer=0,finish=0;
+    const reduced=()=>globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const cancel=()=>{clearTimeout(timer);timer=0;};
+    const stop=()=>{clearTimeout(finish);finish=0;element.classList.remove('is-icon-animating');};
+    const play=()=>{
+      cancel();
+      if(reduced()||!element.isConnected||element.classList.contains('is-icon-animating'))return;
+      element.classList.add('is-icon-animating');
+      finish=setTimeout(stop,460);
+    };
+    element.addEventListener('pointerenter',event=>{
+      if(event.pointerType==='touch'||!globalThis.matchMedia?.('(hover: hover)').matches)return;
+      cancel();timer=setTimeout(play,70);
+    });
     element.addEventListener('pointerleave',cancel);
-    element.addEventListener('focus',play);
-    element.addEventListener('pointerdown',play);
+    element.addEventListener('blur',cancel);
+    element.addEventListener('focus',()=>{if(element.matches(':focus-visible'))play();});
+    element.addEventListener('animationend',event=>{if(event.animationName.startsWith('nav-icon-'))stop();});
   });
 }
