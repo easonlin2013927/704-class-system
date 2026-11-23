@@ -4,7 +4,7 @@ import {verify as verifyPassword} from './password.mjs';
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
 const normalize=value=>typeof value==='string'?value.trim().toLowerCase():'';
 const certUrl='https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
-const providers={google:'Google',github:'GitHub'};
+const providers={google:'Google',github:'GitHub',microsoft:'Microsoft'};
 function providerName(provider){if(!Object.hasOwn(providers,provider))fail(400,'不支援的登入服務');return providers[provider];}
 
 export function createFirebaseAuth(db,config=firebaseConfig,fetchCertificates=fetch,now=()=>Date.now()){
@@ -101,7 +101,7 @@ export function createFirebaseAuth(db,config=firebaseConfig,fetchCertificates=fe
   async validateLocal(session){
    if(!session.firebase_user_id)return;
    if(!session.firebase_binding_id)fail(401,'請先用系統帳密登入，再到設定綁定登入服務');
-   const binding=(await db.query("select id from account_login_providers704 where id=$1 and account_id=$2 and provider in ('google','github') and firebase_user_id=$3",[session.firebase_binding_id,session.id,session.firebase_user_id])).rows[0];
+   const binding=(await db.query("select id from account_login_providers704 where id=$1 and account_id=$2 and provider in ('google','github','microsoft') and firebase_user_id=$3",[session.firebase_binding_id,session.id,session.firebase_user_id])).rows[0];
    if(!binding)fail(401,'登入服務綁定已解除，請重新登入');
   }
  };

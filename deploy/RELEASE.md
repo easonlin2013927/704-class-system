@@ -1,3 +1,13 @@
+# v0.33.0 Microsoft 登入與綁定
+
+- 各身分登入頁新增 Microsoft 登入，設定的登入服務加入 Microsoft 卡片及官方標誌。
+- 使用 Firebase `microsoft.com` 授權，不依相同信箱自動配對或合併；首次須使用系統帳密登入並綁定。
+- 保留 Google、GitHub 與帳密登入；每個外部帳戶僅能綁定一個系統帳號。
+- 綁定需系統密碼及最近五分鐘的授權；解除僅撤銷該綁定的登入。
+- 本版需更新前端、Worker 與 API。Microsoft Client Secret 只設定於 Firebase。
+
+---
+
 # v0.32.0 GitHub 登入與綁定
 
 - 學生、教師／小老師與管理員登入頁加入 GitHub，顯示官方圖示。

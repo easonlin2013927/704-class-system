@@ -37,4 +37,13 @@ assert.equal(await exchangeProviderLogin(sdk,auth,'student',true,async(token,por
 await assert.rejects(authorizeProviderAccount(sdk,auth,assert.fail,'unknown'),/不支援/);
 assert.match(providerLoginError({code:'auth/popup-blocked'},'github').message,/GitHub/);
 assert.match(providerLoginError({code:'auth/account-exists-with-different-credential'},'github').message,/不會自動合併/);
-console.log('Firebase frontend: token exchange, denied account, popup cancellation, cleanup and disabled config passed');
+cloud.authConfig=async()=>({firebase:{enabled:true,bindingRequired:true,providers:['google','github']}});
+await mountProviderLogin(button,'student',assert.fail,assert.fail,'microsoft');
+assert.equal(button.hidden,true,'Backend without Microsoft capability must not expose an unsupported login');
+sdk.OAuthProvider=class {constructor(id){assert.equal(id,'microsoft.com');}setCustomParameters(value){assert.deepEqual(value,{prompt:'select_account'});}};
+sdk.signInWithPopup=async(authValue,provider)=>{assert.equal(authValue,auth);assert.ok(provider instanceof sdk.OAuthProvider);return {user:{getIdToken:async()=> 'microsoft-firebase-id-token'}};};
+assert.equal(await exchangeProviderLogin(sdk,auth,'teacher',true,async(token,portal,remember,provider)=>{assert.equal(token,'microsoft-firebase-id-token');assert.equal(provider,'microsoft');assert.equal(portal,'teacher');assert.equal(remember,true);return profile;},()=>{},'microsoft'),profile);
+const beforeCancel=cleaned;sdk.signInWithPopup=async()=>{throw Object.assign(Error('cancelled'),{code:'auth/popup-closed-by-user'});};
+await assert.rejects(authorizeProviderAccount(sdk,auth,assert.fail,'microsoft'),/cancelled/);assert.equal(cleaned,beforeCancel+1);
+assert.match(providerLoginError({code:'auth/operation-not-allowed'},'microsoft').message,/Microsoft/);
+console.log('Firebase frontend: Google, GitHub, Microsoft exchange, popup cleanup and capability gates passed');

@@ -33,7 +33,7 @@ function fixture(){
 const login={portal:'student',remember:true},user={id:'account_1'},change={current_password:password};
 test('missing configuration disables Google login',async()=>{
  const auth=createFirebaseAuth({}, {projectId:'fixture',apiKey:''});
- assert.deepEqual(auth.config(),{firebase:{enabled:false,bindingRequired:true,providers:['google','github'],config:null}});
+ assert.deepEqual(auth.config(),{firebase:{enabled:false,bindingRequired:true,providers:['google','github','microsoft'],config:null}});
  await assert.rejects(auth.login({...login,token:jwt()}),{status:503});
 });
 test('login uses bound provider subject and Firebase UID, never email fallback',async()=>{
@@ -43,7 +43,7 @@ test('login uses bound provider subject and Firebase UID, never email fallback',
  assert.deepEqual(state.queries[0].args,['google-sub','firebase-user','google']);
  assert.equal((await auth.login({...login,token:jwt({email:'renamed@example.com'})})).account.id,'account_1');
  state.linked=false;await assert.rejects(auth.login({...login,token:jwt()}),{status:403});
- assert.equal(state.fetches,1);assert.deepEqual(auth.config(),{firebase:{enabled:true,bindingRequired:true,providers:['google','github'],config}});
+ assert.equal(state.fetches,1);assert.deepEqual(auth.config(),{firebase:{enabled:true,bindingRequired:true,providers:['google','github','microsoft'],config}});
 });
 test('same email with another Google subject or Firebase UID cannot log in',async()=>{
  for(const overrides of [{sub:'other-firebase-user'},{firebase:{sign_in_provider:'google.com',identities:{'google.com':['other-google-sub']}}}])await assert.rejects(fixture().auth.login({...login,token:jwt(overrides)}),{status:403});
@@ -94,7 +94,7 @@ test('unlink verifies password; revoked and legacy Google sessions fail while pa
  await auth.validateLocal(user);
 });
 test('provider list exposes only display metadata',async()=>{
- const {auth}=fixture();assert.deepEqual(await auth.providers(user),{providers:[{id:'google',name:'Google',enabled:true,linked:{provider:'google',email:'bound@example.com',created_at:'fixture-date'}},{id:'github',name:'GitHub',enabled:true,linked:null}]});
+ const {auth}=fixture();assert.deepEqual(await auth.providers(user),{providers:[{id:'google',name:'Google',enabled:true,linked:{provider:'google',email:'bound@example.com',created_at:'fixture-date'}},{id:'github',name:'GitHub',enabled:true,linked:null},{id:'microsoft',name:'Microsoft',enabled:true,linked:null}]});
 });
 test('invalid payload and unavailable certificate service fail closed',async()=>{
  await assert.rejects(fixture().auth.login({...login,token:jwt(),remember:'yes'}),{status:400});
@@ -128,6 +128,37 @@ test('unlink signs out only sessions using the deleted binding, preserving other
  const deletes=state.queries.filter(query=>query.sql.startsWith('delete from account_login'));
  assert.ok(deletes.every(query=>query.args[0]===user.id&&query.args[1]==='github'));
  await assert.rejects(auth.unlink(user,change,'unknown'),{status:400});
+});
+const microsoftToken=overrides=>jwt({email:undefined,email_verified:false,firebase:{sign_in_provider:'microsoft.com',identities:{'microsoft.com':['microsoft-sub']}},...overrides});
+test('Microsoft login checks signed provider identity and UID, never matches notification email',async()=>{
+ const {auth,state}=fixture();state.provider='microsoft';
+ const result=await auth.login({...login,provider:'microsoft',token:microsoftToken()});
+ assert.equal(result.provider,'microsoft');assert.equal(result.email,'');assert.equal(result.account.id,user.id);
+ assert.deepEqual(state.queries[0].args,['microsoft-sub','firebase-user','microsoft']);
+ assert.equal((await auth.login({...login,provider:'microsoft',token:microsoftToken({email:'changed@example.com'})})).account.id,user.id);
+ for(const token of [jwt(),githubToken(),microsoftToken({sub:'other-user'}),microsoftToken({firebase:{sign_in_provider:'microsoft.com',identities:{'microsoft.com':['other']}}})])await assert.rejects(auth.login({...login,provider:'microsoft',token}),{status:403});
+ await assert.rejects(auth.login({...login,provider:'google',token:microsoftToken()}),{status:403});
+ state.linked=false;await assert.rejects(auth.login({...login,provider:'microsoft',token:microsoftToken()}),{status:403});
+});
+test('Microsoft binding requires password and recent proof and refuses duplicate ownership',async()=>{
+ const {auth,state}=fixture();state.provider='microsoft';state.linked=false;
+ await assert.rejects(auth.link(user,{token:microsoftToken()},'microsoft'),{status:400});
+ await assert.rejects(auth.link(user,{current_password:'wrong',token:microsoftToken()},'microsoft'),{status:403});
+ await assert.rejects(auth.link(user,{...change,token:jwt()},'microsoft'),{status:403});
+ await assert.rejects(auth.link(user,{...change,token:microsoftToken({auth_time:1699999699})},'microsoft'),{status:403});
+ assert.equal((await auth.link(user,{...change,token:microsoftToken(),account_id:'forged-owner'},'microsoft')).provider,'microsoft');
+ const insert=state.queries.find(query=>query.sql.startsWith('insert into account_login'));
+ assert.deepEqual(insert.args,[user.id,'microsoft-sub','firebase-user','','microsoft']);
+ await assert.rejects(auth.link(user,{...change,token:microsoftToken()},'microsoft'),{status:409});
+});
+test('Microsoft sessions revoke with their binding while other provider sessions survive unlink',async()=>{
+ const {auth,state}=fixture();state.provider='microsoft';
+ const session={...user,firebase_user_id:'firebase-user',firebase_binding_id:'binding_1'};
+ await auth.validateLocal(session);assert.match(state.queries.at(-1).sql,/'microsoft'/);
+ assert.deepEqual(await auth.unlink({...session,firebase_binding_id:'google-binding'},change,'microsoft'),{ok:true,sign_out:false});
+ state.linked=true;assert.deepEqual(await auth.unlink(session,change,'microsoft'),{ok:true,sign_out:true});
+ await assert.rejects(auth.validateLocal(session),{status:401});await auth.validateLocal(user);
+ assert.deepEqual(state.queries.filter(query=>query.sql.startsWith('delete from account_login')).map(query=>query.args),[[user.id,'microsoft'],[user.id,'microsoft']]);
 });
 test('schema guarantees identity uniqueness and cascade revocation; theme migration runs once and rolls back',async()=>{
  let exists=false,pending=false,resets=0,fail=false;const statements=[];

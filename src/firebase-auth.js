@@ -1,7 +1,7 @@
 import { cloud } from './cloud.js';
 
 let loading;
-export const loginProviders={google:{name:'Google',logo:'./src/google-logo.png'},github:{name:'GitHub',logo:'./src/github-logo.svg'}};
+export const loginProviders={google:{name:'Google',logo:'./src/google-logo.png'},github:{name:'GitHub',logo:'./src/github-logo.svg'},microsoft:{name:'Microsoft',logo:'./src/microsoft-logo.svg'}};
 export function providerButtonLabel(button,label,provider='google'){
   const logo=document.createElement('img');
   logo.src=loginProviders[provider].logo;logo.alt='';logo.width=20;logo.height=20;
@@ -45,8 +45,8 @@ export async function prepareFirebaseAuth(config){
 
 export async function authorizeProviderAccount(sdk, auth, exchange,providerId='google') {
   if(!Object.hasOwn(loginProviders,providerId))throw new Error('不支援的登入服務');
-  const provider = providerId==='github'?new sdk.GithubAuthProvider():new sdk.GoogleAuthProvider();
-  if(providerId==='google')provider.setCustomParameters({ prompt: 'select_account' });
+  const provider = providerId==='microsoft'?new sdk.OAuthProvider('microsoft.com'):providerId==='github'?new sdk.GithubAuthProvider():new sdk.GoogleAuthProvider();
+  if(providerId==='google'||providerId==='microsoft')provider.setCustomParameters({ prompt: 'select_account' });
   try {
     const result = await sdk.signInWithPopup(auth, provider);
     const token = await result.user.getIdToken();
@@ -90,7 +90,7 @@ export async function mountProviderLogin(button, portal, onProfile, onError,prov
   providerButtonLabel(button,`使用 ${name} 登入`,provider);
   button.onclick = async () => {
     button.disabled = true;
-    const otherButtons=[...document.querySelectorAll('#login-form [type="submit"],#google-login,#github-login')].filter(control=>control!==button&&!control.disabled);
+    const otherButtons=[...document.querySelectorAll('#login-form [type="submit"],#google-login,#github-login,#microsoft-login')].filter(control=>control!==button&&!control.disabled);
     otherButtons.forEach(control=>control.disabled=true);
     try {
       const remember = !!document.querySelector('#login-form [name="remember"]')?.checked;

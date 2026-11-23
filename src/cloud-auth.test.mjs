@@ -28,5 +28,9 @@ await cloud.bindProvider('github',{token:'github-token',current_password:'fixtur
 await cloud.unlinkProvider('github',{current_password:'fixture-password'});
 await cloud.loginFirebase('github-token','student',true,'github');
 assert.deepEqual(exchanges.at(-1),{token:'github-token',portal:'student',remember:true,provider:'github'});
+await cloud.bindProvider('microsoft',{token:'microsoft-token',current_password:'fixture-password'});
+await cloud.unlinkProvider('microsoft',{current_password:'fixture-password'});
+await cloud.loginFirebase('microsoft-token','teacher',true,'microsoft');
+assert.deepEqual(exchanges.at(-1),{token:'microsoft-token',portal:'teacher',remember:true,provider:'microsoft'});
 assert.deepEqual(await cloud.school('permissions'),{ok:true},'Provider management must retain the local bearer token');
 console.log('Shared auth module and Google exchange regression checks passed');
