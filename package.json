@@ -1,13 +1,14 @@
 {
   "name": "campus-bulletin",
   "private": true,
-  "version": "0.33.3",
+  "version": "0.33.4",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "node --check src/main.js"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.6.0",
     "esbuild": "^0.28.2"
   },
   "dependencies": {

@@ -1,5 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {PGlite} from '@electric-sql/pglite';
 import {loadToday} from './today.mjs';
 
 function database(){
@@ -13,7 +15,6 @@ function database(){
    return {rows:[{id:'announcement',title:'Today',category:'general'}]};
   }
   if(sql.includes('from countdowns704')){
-   assert.doesNotMatch(sql,/ends_at/,'countdowns704 has no ends_at column');
    return {rows:[{id:'activity',target_at:'2026-11-23T03:00:00Z'}]};
   }
   if(sql.includes('from school_homework'))return {rows:[{id:'homework',due_on:'2026-11-23'}]};
@@ -69,4 +70,50 @@ test('Today uses Taipei day and excludes future, expired and unpublished announc
 });
 test('Database failure remains an error, never a misleading empty success',async()=>{
  await assert.rejects(loadToday({query:async()=>{throw Error('database unavailable');}},{id:'student',role:'student'}),/database unavailable/);
+});
+
+test('Real PostgreSQL executes Today with project migrations and enforces data visibility',async()=>{
+ const pg=new PGlite();
+ try{
+  for(const [file,start,end] of [['db.mjs','export async function migrate()',null],['school.mjs','export async function migrateSchool()','export async function schoolRoutes'],['enhancements.mjs','export async function migrateEnhancements()','export async function publishScheduledAnnouncements']]){
+   const source=readFileSync(new URL(file,import.meta.url),'utf8'),section=source.slice(source.indexOf(start),end?source.indexOf(end):undefined);
+   for(const match of section.matchAll(/await db\.query\(`([\s\S]*?)`\)/g))await pg.exec(match[1]);
+  }
+  const student='00000000-0000-4000-8000-000000000001',other='00000000-0000-4000-8000-000000000002',subject='00000000-0000-4000-8000-000000000003';
+  const day="(now() at time zone 'Asia/Taipei')::date";
+  await pg.exec(`begin;
+   insert into accounts704(id,email,display_name,role,password_hash) values('${student}','one','One','student','unused'),('${other}','two','Two','student','unused');
+   insert into school_subjects(id,name) values('${subject}','Math');
+   insert into school_homework(id,subject_id,title,work_day,due_on,recipients) values
+    (gen_random_uuid(),'${subject}','Public homework',${day},${day},null),
+    (gen_random_uuid(),'${subject}','My homework',${day},${day},array['${student}'::uuid]),
+    (gen_random_uuid(),'${subject}','Other homework',${day},${day},array['${other}'::uuid]),
+    (gen_random_uuid(),'${subject}','Later homework',${day}-1,${day}+4,null);
+   insert into school_records(id,kind,student_id,title,record_day) values
+    (gen_random_uuid(),'missing','${student}','My record',${day}-2),
+    (gen_random_uuid(),'missing','${other}','Other record',${day});
+   insert into announcements704(id,title,category,author,audience,content,date,workflow_status,publish_at,expires_at) values
+    (gen_random_uuid(),'Visible','general','Test','學生','',now(),'published',null,null),
+    (gen_random_uuid(),'Teachers only','general','Test','教師','',now(),'published',null,null),
+    (gen_random_uuid(),'Draft','general','Test','學生','',now(),'draft',null,null),
+    (gen_random_uuid(),'Future','general','Test','學生','',now(),'published',now()+interval '1 hour',null),
+    (gen_random_uuid(),'Expired','general','Test','學生','',now(),'published',null,now());
+   insert into countdowns704(id,title,target_at) values(gen_random_uuid(),'Today activity',now()),(gen_random_uuid(),'Tomorrow activity',now()+interval '1 day');
+  `);
+  const db={query:(sql,values=[])=>pg.query(sql,values)};
+  const mine=await loadToday(db,{id:student,role:'student'});
+  assert.deepEqual(mine.announcements.map(x=>x.title),['Visible']);
+  assert.deepEqual(mine.homework.map(x=>x.title).sort(),['My homework','Public homework']);
+  assert.deepEqual(mine.records.map(x=>x.title),['My record']);
+  assert.deepEqual(mine.activities.map(x=>x.title),['Today activity']);
+  assert.match(mine.day,/^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(mine.homework[0].due_on,mine.day);
+  assert.ok(Number.isFinite(new Date(mine.date).getTime()));
+  const admin=await loadToday(db,{id:student,role:'admin'});
+  assert.equal(admin.records.length,2);assert.equal(admin.homework.length,3);
+  for(const role of ['teacher','assistant']){
+   const restricted=await loadToday(db,{id:student,role,permissions:{}});
+   assert.deepEqual(restricted.homework,[]);assert.deepEqual(restricted.records,[]);
+  }
+ }finally{await pg.close();}
 });
