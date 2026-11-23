@@ -293,8 +293,12 @@
 .provider-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:18px 0;border-bottom:1px solid var(--line)}
 .provider-logo{flex:0 0 40px;width:40px;height:40px;padding:10px;box-sizing:border-box;background:#fff;border-radius:8px;object-fit:contain}
 .provider-info{flex:1;min-width:160px;overflow-wrap:anywhere}.provider-info p{margin:6px 0;color:var(--muted)}
-.google-auth-button.google-auth-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:44px;padding:12px 16px;background:#fff!important;color:#1f1f1f!important;border:1px solid #747775!important;font:500 14px/20px Arial,sans-serif}
-.google-auth-button.google-auth-button:hover{background:#f8fafd!important;color:#1f1f1f!important}.google-auth-button img{width:20px;height:20px;flex:0 0 20px;object-fit:contain}
+.google-auth-button.google-auth-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:44px;padding:12px 16px;background:var(--control)!important;color:var(--ink)!important;border:1px solid var(--line-strong,var(--line))!important;font:500 14px/20px Arial,sans-serif}
+.google-auth-button.google-auth-button:hover{background:var(--surface-2,var(--surface))!important;color:var(--ink)!important}.provider-button-logo{display:inline-block;width:20px;height:20px;flex:0 0 20px;object-fit:contain}
+.provider-logo-glyph{background:currentColor;mask:url('./github-logo.svg') center/contain no-repeat;-webkit-mask:url('./github-logo.svg') center/contain no-repeat}
+.login-provider-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:18px 0 12px}
+.login-provider-buttons .google-auth-button{width:100%;min-width:0;height:88px;padding:10px 4px;flex-direction:column;gap:6px;font-size:12px;line-height:1.35;white-space:normal}
+.login-provider-buttons .provider-button-label{min-width:0;max-width:100%;overflow-wrap:normal}
 
 .provider-row button,[data-provider-confirm],[data-provider-cancel]{min-height:44px}
 

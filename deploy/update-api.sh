@@ -2,8 +2,8 @@
 set -euo pipefail
 ROOT=/data/704-class-system
 ENV_FILE="$HOME/.config/704-api/mail-0194.env"
-IMAGE=announcement704/704-api:0.33.0
-TEST=api704-v0330-test
+IMAGE=announcement704/704-api:0.33.1
+TEST=api704-v0331-test
 test -f "$ENV_FILE"
 test -d "$ROOT/uploads"
 if ! grep -q '^FIREBASE_API_KEY=.' "$ENV_FILE"; then
@@ -35,7 +35,7 @@ ready() {
 ready 7041
 docker exec "$TEST" sh -c 'test -w /data/chat-files'
 docker rm -f "$TEST"
-BACKUP="api704-pre-v0330-$(date +%Y%m%d-%H%M%S)"
+BACKUP="api704-pre-v0331-$(date +%Y%m%d-%H%M%S)"
 docker stop api704
 docker rename api704 "$BACKUP"
 rollback() {
@@ -47,7 +47,7 @@ rollback() {
 if docker create --name api704 --network 1panel-network --restart unless-stopped \
   -p 127.0.0.1:7040:7040 --env-file "$ENV_FILE" \
   -v "$ROOT/uploads:/data/chat-files" "$IMAGE" && docker start api704 && ready 7040; then
-  echo "DEPLOY_OK v0.33.0; BACKUP=$BACKUP"
+  echo "DEPLOY_OK v0.33.1; BACKUP=$BACKUP"
 else
   rollback
   exit 1

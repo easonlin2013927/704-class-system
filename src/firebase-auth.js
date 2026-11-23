@@ -3,10 +3,16 @@ import { cloud } from './cloud.js';
 let loading;
 export const loginProviders={google:{name:'Google',logo:'./src/google-logo.png'},github:{name:'GitHub',logo:'./src/github-logo.svg'},microsoft:{name:'Microsoft',logo:'./src/microsoft-logo.svg'}};
 export function providerButtonLabel(button,label,provider='google'){
-  const logo=document.createElement('img');
-  logo.src=loginProviders[provider].logo;logo.alt='';logo.width=20;logo.height=20;
+  const logo=document.createElement(provider==='github'?'span':'img');
+  logo.className='provider-button-logo';
+  if(provider==='github'){logo.classList.add('provider-logo-glyph');logo.setAttribute('aria-hidden','true');}
+  else{logo.src=loginProviders[provider].logo;logo.alt='';logo.width=20;logo.height=20;}
+  const text=document.createElement('span');text.className='provider-button-label';
+  const name=loginProviders[provider].name,inLogin=button.closest('.login-provider-buttons');
+  text.textContent=inLogin&&label===`使用 ${name} 登入`?`${name} 登入`:inLogin&&label.startsWith('正在準備')?`${name} 準備中`:label;
+  button.setAttribute('aria-label',label);
   button.classList.add('google-auth-button');
-  button.replaceChildren(logo,document.createTextNode(label));
+  button.replaceChildren(logo,text);
 }
 function loadFirebase(config) {
   if (!loading) loading = (async () => {

@@ -45,6 +45,7 @@ await build({
   bundle: true,
   minify: true,
   legalComments: "none",
+  loader: { ".svg": "dataurl" },
   outfile: resolve(`dist/assets/${assetBase}.css`),
 });
 

@@ -2,13 +2,13 @@ import {mountAccountProviders} from './account-providers.js';
 import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
 import { mountProviderLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.33.0";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.33.0';
-import {mountMailboxes} from './mailboxes.js?v=0.33.0';
-import {mountMailTest} from './mail-test.js?v=0.33.0';
-import { portals, portalRole } from "./portal.js?v=0.33.0";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.33.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.33.0';
+import { initConnectivityGuard } from "./connectivity.js?v=0.33.1";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.33.1';
+import {mountMailboxes} from './mailboxes.js?v=0.33.1';
+import {mountMailTest} from './mail-test.js?v=0.33.1';
+import { portals, portalRole } from "./portal.js?v=0.33.1";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.33.1";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.33.1';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 
 initConnectivityGuard();
@@ -199,9 +199,11 @@ function renderLogin() {
           <div class="portal-pill"><span></span>${portal.eyebrow}</div>
           <h1>${portal.title}</h1>
           <p class="muted">${portal.description}</p>
-          <button type="button" id="google-login" class="secondary-button wide" hidden>使用 Google 登入</button>
-          <button type="button" id="github-login" class="secondary-button wide" hidden>使用 GitHub 登入</button>
-          <button type="button" id="microsoft-login" class="secondary-button wide" hidden>使用 Microsoft 登入</button>
+          <div class="login-provider-buttons" role="group" aria-label="其他登入方式">
+          <button type="button" id="google-login" class="secondary-button" hidden>使用 Google 登入</button>
+          <button type="button" id="github-login" class="secondary-button" hidden>使用 GitHub 登入</button>
+          <button type="button" id="microsoft-login" class="secondary-button" hidden>使用 Microsoft 登入</button>
+          </div>
           <p class="helper">首次使用請以帳號密碼登入，再到「設定／帳號管理／登入服務」綁定 Google、GitHub 或 Microsoft。</p>
           <form id="login-form">
             <label>帳號<input name="account" autocomplete="username" placeholder="請輸入帳號" type="text" required></label>

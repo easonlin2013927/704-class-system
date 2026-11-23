@@ -232,6 +232,10 @@ bash /data/704-class-system/source/deploy/update-api.sh
 腳本先在 7041 連接埠檢查新版，切換失敗會還原上一個容器；上傳目錄持續掛載在硬碟。
 
 Google 登入流程依據 [Firebase 官方文件](https://firebase.google.com/docs/auth/web/google-signin)，後端依 [ID token 驗證規則](https://firebase.google.com/docs/auth/admin/verify-id-tokens) 驗證簽章及身分。
+## 登入與郵件外觀（v0.33.1）
+
+三個供應商登入按鈕使用系統主題色，等寬排列於同一排。通知郵件統一使用黑白灰、細邊框與線條分隔，保留純文字版本。前端更新 Pages 後生效；郵件需更新 API，已寄出的郵件不會更改。
+
 ## Microsoft 登入（v0.33.0）
 
 登入頁與「設定／帳號管理／登入服務」支援 Microsoft，保留 Google 與 GitHub。首次先用系統帳密登入並綁定外部帳戶。Microsoft 的用戶端密碼只設定於 Firebase，本版需部署 API 與 Worker。操作與 Entra 帳戶類型說明見 [登入服務操作說明](docs/wiki/Account-Login.md)。
