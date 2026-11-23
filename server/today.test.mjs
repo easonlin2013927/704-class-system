@@ -10,6 +10,7 @@ function database(){
   calls.push({sql,values});
   const placeholders=[...sql.matchAll(/\$(\d+)/g)].map(x=>Number(x[1]));
   assert.equal(values.length,Math.max(0,...placeholders),'PostgreSQL bind parameter count');
+  if(sql.startsWith('select (select count'))return {rows:[{pending_records:2,drafts:1,scheduled:1,pending_reports:1,active_accounts:4,disabled_accounts:1}]};
   if(sql.includes('from announcements704')){
    assert.doesNotMatch(sql,/created_at/,'announcements704 timestamp column is date');
    return {rows:[{id:'announcement',title:'Today',category:'general'}]};
@@ -48,8 +49,8 @@ test('Teachers and assistants without capabilities cannot query homework or reco
   assert.equal(db.calls.some(x=>/from school_(homework|records)/.test(x.sql)),false);
  }
 });
-test('Explicit capabilities grant their section, including elevated students',async()=>{
- for(const role of ['teacher','assistant','student']){
+test('Staff capabilities grant sections, while student Today remains personal',async()=>{
+ for(const role of ['teacher','assistant']){
   const db=database();await loadToday(db,{id:role,role,permissions:{homework:true,records:true,publish:true}});
   assert.match(db.calls.find(x=>x.sql.includes('from school_homework')).sql,/from school_homework/);
   const records=db.calls.find(x=>x.sql.includes('from school_records'));
@@ -57,6 +58,10 @@ test('Explicit capabilities grant their section, including elevated students',as
   assert.deepEqual(records.values,[]);
   assert.doesNotMatch(db.calls[0].sql,/and audience in/);
  }
+ const db=database(),result=await loadToday(db,{id:'student',role:'student',permissions:{homework:true,records:true,publish:true}});
+ assert.match(db.calls.find(x=>x.sql.includes('from school_records')).sql,/and r\.student_id=\$1/);
+ assert.match(db.calls.find(x=>x.sql.includes('from school_homework')).sql,/h\.recipients is null or \$1=any/);
+ assert.deepEqual(result.overview,{});
 });
 test('Today uses Taipei day and excludes future, expired and unpublished announcements',async()=>{
  const db=database();await loadToday(db,{id:'student',role:'student'});
@@ -79,16 +84,25 @@ test('Real PostgreSQL executes Today with project migrations and enforces data v
    const source=readFileSync(new URL(file,import.meta.url),'utf8'),section=source.slice(source.indexOf(start),end?source.indexOf(end):undefined);
    for(const match of section.matchAll(/await db\.query\(`([\s\S]*?)`\)/g))await pg.exec(match[1]);
   }
-  const student='00000000-0000-4000-8000-000000000001',other='00000000-0000-4000-8000-000000000002',subject='00000000-0000-4000-8000-000000000003';
+  const student='00000000-0000-4000-8000-000000000001',other='00000000-0000-4000-8000-000000000002',subject='00000000-0000-4000-8000-000000000003',disabled='00000000-0000-4000-8000-000000000004',teacher='00000000-0000-4000-8000-000000000005',assistant='00000000-0000-4000-8000-000000000006';
   const day="(now() at time zone 'Asia/Taipei')::date";
   await pg.exec(`begin;
    insert into accounts704(id,email,display_name,role,password_hash) values('${student}','one','One','student','unused'),('${other}','two','Two','student','unused');
+   insert into accounts704(id,email,display_name,role,password_hash,disabled) values('${disabled}','disabled','Disabled','student','unused',true),('${teacher}','teacher','Teacher','teacher','unused',false),('${assistant}','assistant','Assistant','assistant','unused',false);
    insert into school_subjects(id,name) values('${subject}','Math');
    insert into school_homework(id,subject_id,title,work_day,due_on,recipients) values
     (gen_random_uuid(),'${subject}','Public homework',${day},${day},null),
     (gen_random_uuid(),'${subject}','My homework',${day},${day},array['${student}'::uuid]),
     (gen_random_uuid(),'${subject}','Other homework',${day},${day},array['${other}'::uuid]),
     (gen_random_uuid(),'${subject}','Later homework',${day}-1,${day}+4,null);
+   update school_homework set author_id='${assistant}' where title='My homework';
+   update school_homework set author_id='${teacher}' where title='Public homework';
+   insert into school_checks(homework_id,student_id,done) select id,'${student}',true from school_homework where title='Public homework';
+   insert into school_checks(homework_id,student_id,done) select id,'${disabled}',true from school_homework where title='Public homework';
+   insert into school_checks(homework_id,student_id,done) select id,'${other}',true from school_homework where title='My homework';
+   update school_homework set submission_mode='link' where title='My homework';
+   insert into school_homework_submissions(homework_id,student_id) select id,'${student}' from school_homework where title='My homework';
+   insert into school_homework_submissions(homework_id,student_id) select id,'${other}' from school_homework where title='Public homework';
    insert into school_records(id,kind,student_id,title,record_day) values
     (gen_random_uuid(),'missing','${student}','My record',${day}-2),
     (gen_random_uuid(),'missing','${other}','Other record',${day});
@@ -98,6 +112,11 @@ test('Real PostgreSQL executes Today with project migrations and enforces data v
     (gen_random_uuid(),'Draft','general','Test','學生','',now(),'draft',null,null),
     (gen_random_uuid(),'Future','general','Test','學生','',now(),'published',now()+interval '1 hour',null),
     (gen_random_uuid(),'Expired','general','Test','學生','',now(),'published',null,now());
+   update announcements704 set author_id='${teacher}' where title='Draft';
+   insert into announcements704(id,title,category,author,audience,content,workflow_status,author_id,publish_at) values
+    (gen_random_uuid(),'Assistant draft','general','Test','學生','','draft','${assistant}',null),
+    (gen_random_uuid(),'Teacher scheduled','general','Test','學生','','scheduled','${teacher}',now()+interval '1 day');
+   insert into school_reports(id,reporter_id,reason,report_type) values(gen_random_uuid(),'${student}','Test report','other');
    insert into countdowns704(id,title,target_at) values(gen_random_uuid(),'Today activity',now()),(gen_random_uuid(),'Tomorrow activity',now()+interval '1 day');
   `);
   const db={query:(sql,values=[])=>pg.query(sql,values)};
@@ -108,12 +127,28 @@ test('Real PostgreSQL executes Today with project migrations and enforces data v
   assert.deepEqual(mine.activities.map(x=>x.title),['Today activity']);
   assert.match(mine.day,/^\d{4}-\d{2}-\d{2}$/);
   assert.equal(mine.homework[0].due_on,mine.day);
+  assert.equal(mine.homework.find(x=>x.title==='My homework').done,true);
   assert.ok(Number.isFinite(new Date(mine.date).getTime()));
+  assert.deepEqual(mine.overview,{});
   const admin=await loadToday(db,{id:student,role:'admin'});
   assert.equal(admin.records.length,2);assert.equal(admin.homework.length,3);
+  assert.deepEqual(admin.homework.find(x=>x.title==='Public homework').progress,{assigned:2,completed:1});
+  assert.deepEqual(admin.homework.find(x=>x.title==='My homework').progress,{assigned:1,completed:1});
+  assert.deepEqual(admin.overview,{pending_records:2,drafts:2,scheduled:1,pending_reports:1,active_accounts:4,disabled_accounts:1});
+  const teaching=await loadToday(db,{id:teacher,role:'teacher',permissions:{homework:true,records:true,publish:true,reports:true}});
+  assert.deepEqual(teaching.overview,{pending_records:2,drafts:1,scheduled:1,pending_reports:1});
+  assert.equal(teaching.homework.length,3);
+  const publishing=await loadToday(db,{id:teacher,role:'teacher',permissions:{publish:true}});
+  assert.deepEqual(publishing.overview,{drafts:1,scheduled:1});assert.deepEqual(publishing.homework,[]);assert.deepEqual(publishing.records,[]);
+  const assisting=await loadToday(db,{id:assistant,role:'assistant',permissions:{homework:true,publish:true}});
+  assert.deepEqual(assisting.homework.map(x=>x.title),['My homework']);
+  assert.equal(assisting.homework[0].progress,undefined);assert.deepEqual(assisting.overview,{});assert.deepEqual(assisting.records,[]);
+  const elevated=await loadToday(db,{id:student,role:'student',permissions:{homework:true,records:true}});
+  assert.equal(elevated.homework.length,2);assert.equal(elevated.records.length,1);assert.deepEqual(elevated.overview,{});
   for(const role of ['teacher','assistant']){
    const restricted=await loadToday(db,{id:student,role,permissions:{}});
    assert.deepEqual(restricted.homework,[]);assert.deepEqual(restricted.records,[]);
+   assert.deepEqual(restricted.overview,{});
   }
  }finally{await pg.close();}
 });

@@ -1,15 +1,18 @@
 async (page)=>{
  const check=(value,message)=>{if(!value)throw Error(message);};
- await page.route('**/__today-test',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><script type="importmap">{"imports":{"dompurify":"/vendor/dompurify.js"}}</script></head><body><main id="today-test"></main></body></html>'}));
+ await page.route('**/__today-test',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="zh-Hant" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/src/styles.css"><link rel="stylesheet" href="/src/themes.css"><link rel="stylesheet" href="/src/school.css"><link rel="stylesheet" href="/src/resend-system.css"><script type="importmap">{"imports":{"dompurify":"/vendor/dompurify.js"}}</script></head><body><button id="open-accounts">Accounts</button><button id="open-health">Health</button><main id="today-test"></main></body></html>'}));
  await page.goto('http://127.0.0.1:4173/__today-test');
  const cdp=await page.context().newCDPSession(page); await cdp.send('Emulation.setTimezoneOverride',{timezoneId:'America/Los_Angeles'});
  const result=await page.evaluate(async()=>{
   const {mountSchool}=await import('/src/school.js'),{cloud}=await import('/src/cloud.js');
-  const node=document.querySelector('#today-test'),navigation=[];
+  const node=document.querySelector('#today-test'),navigation=[],adminActions=[];
+  document.querySelector('#open-accounts').onclick=()=>adminActions.push('accounts');
+  document.querySelector('#open-health').onclick=()=>adminActions.push('health');
   let announcement=null,fail=false;
   window.addEventListener('open-announcement',e=>announcement=e.detail);
-  cloud.school=async()=>{if(fail)throw Error('Test API unavailable');return {date:'2026-11-22T16:01:00Z',day:'2026-11-23',unread:3,announcements:[{id:'post',title:'<img src=x onerror=alert(1)>',category:'academic'}],activities:[{title:'Class meeting',target_at:'2026-11-23T01:00:00Z'}],homework:[{title:'Math',subject:'Math',due_on:'2026-11-23',done:true}],records:[{title:'Missing work',kind:'missing',resolved:false,student:'Student'}]};};
-  const mount=user=>mountSchool({node,user,view:'today',notify:()=>{},navigate:view=>navigation.push(view)});
+  cloud.school=async()=>{if(fail)throw Error('Test API unavailable');return {date:'2026-11-22T16:01:00Z',day:'2026-11-23',unread:3,overview:{pending_records:2,drafts:1,scheduled:3,pending_reports:4,active_accounts:35,disabled_accounts:2},announcements:[{id:'post',title:'<img src=x onerror=alert(1)>',category:'academic'}],activities:[{title:'Class meeting',target_at:'2026-11-23T01:00:00Z'}],homework:[{title:'Math',subject:'Math',due_on:'2026-11-23',done:true,progress:{assigned:4,completed:1}}],records:[{title:'Missing work',kind:'missing',resolved:false,student:'Student'}]};};
+  const mount=user=>mountSchool({node,user,view:'today',notify:()=>{},navigate:(view,create)=>navigation.push(create?view+':'+create:view)});
+  globalThis.mountTodayFixture=mount;
   await mount({role:'student',id:'student'});
   const studentText=node.textContent;
   const safe=!node.querySelector('img');
@@ -17,23 +20,44 @@ async (page)=>{
   for(const target of ['homework','records','notifications'])node.querySelector(`[data-today-go="${target}"]`).click();
   await mount({role:'assistant',id:'assistant',permissions:{}});
   const restrictedText=node.textContent;
-  await mount({role:'teacher',id:'teacher',permissions:{homework:true,records:true}});
+  const studentNavigation=navigation.slice();
+  await mount({role:'teacher',id:'teacher',permissions:{homework:true,records:true,publish:true,reports:true}});
   const teacherText=node.textContent;
+  node.querySelector('[data-today-create="homework"]').click();
+  node.querySelector('[data-today-create="missing"]').click();
+  await mount({role:'assistant',id:'assistant',permissions:{homework:true,publish:true}});
+  const assistantText=node.textContent;
+  await mount({role:'admin',id:'admin'});
+  const adminText=node.textContent;
+  node.querySelector('[data-today-admin="open-accounts"]').click();
+  node.querySelector('[data-today-admin="open-health"]').click();
   fail=true;await mount({role:'student',id:'student'});
   const errorText=node.textContent;
   fail=false;node.querySelector('[data-today-retry]').click();
   await new Promise(resolve=>setTimeout(resolve,0));
-  return {studentText,safe,announcement,navigation,restrictedText,teacherText,errorText,recovered:node.textContent};
+  return {studentText,safe,announcement,navigation,studentNavigation,restrictedText,teacherText,assistantText,adminText,adminActions,errorText,recovered:node.textContent};
  });
  check(result.studentText.includes('11月23日'),'Taipei date must ignore browser timezone');
  check(result.studentText.includes('今天截止')&&result.studentText.includes('已完成'),'Homework date and status');
  check(result.studentText.includes('課務公告')&&result.studentText.includes('3 則未讀'),'Category and unread labels');
  check(result.safe,'Announcement titles must be escaped');
  check(result.announcement==='post','Announcement click must open detail');
- check(result.navigation.join(',')==='homework,records,notifications','Cards must navigate');
+ check(result.studentNavigation.join(',')==='homework,records,notifications','Cards must navigate');
  check(!result.restrictedText.includes('作業與期限')&&!result.restrictedText.includes('班級紀錄'),'Unauthorized sections hidden');
- check(result.teacherText.includes('班級紀錄')&&result.teacherText.includes('Student'),'Staff records available');
+ check(result.teacherText.includes('班級待辦與紀錄')&&result.teacherText.includes('Student'),'Staff records available');
+ check(result.teacherText.includes('教師總覽')&&result.teacherText.includes('完成 1 / 4 人')&&result.teacherText.includes('我的草稿'),'Teacher class overview');
+ check(!result.teacherText.includes('已完成')&&!result.teacherText.includes('啟用帳號'),'Teacher must not see own check status or administrator counts');
+ check(result.assistantText.includes('小老師協作')&&result.assistantText.includes('我登錄的作業')&&!result.assistantText.includes('管理重點')&&!result.assistantText.includes('已完成'),'Assistant own work, not student or manager view');
+ check(result.adminText.includes('管理員總覽')&&result.adminText.includes('啟用帳號')&&result.adminText.includes('待處理檢舉'),'Administrator operational summary');
+ check(result.adminActions.join(',')==='accounts,health','Administrator shortcuts use existing header actions');
+ check(result.navigation.includes('homework:homework')&&result.navigation.includes('records:missing'),'Staff create shortcuts');
+ check(result.studentText.includes('我的今天')&&!result.studentText.includes('管理重點')&&!result.studentText.includes('完成 1 / 4 人'),'Student personal view');
  check(result.errorText.includes('Test API unavailable')&&result.errorText.includes('重新載入'),'Recoverable API error');
  check(result.recovered.includes('今日公告'),'Retry must recover');
- console.log('Today browser checks passed: date, permissions, escaping, navigation, retry');
+ await page.evaluate(()=>globalThis.mountTodayFixture({role:'admin',id:'admin'}));
+ for(const width of [1440,1024,768,390]){
+  await page.setViewportSize({width,height:900});
+  check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow at '+width);
+ }
+ return 'Today browser checks passed: four roles, responsive layout, date, permissions, navigation and retry';
 }

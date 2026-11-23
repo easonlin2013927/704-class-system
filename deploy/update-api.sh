@@ -2,8 +2,8 @@
 set -euo pipefail
 ROOT=/data/704-class-system
 ENV_FILE="$HOME/.config/704-api/mail-0194.env"
-IMAGE=announcement704/704-api:0.33.4
-TEST=api704-v0334-test
+IMAGE=announcement704/704-api:0.34.0
+TEST=api704-v0340-test
 test -f "$ENV_FILE"
 test -d "$ROOT/uploads"
 if ! grep -q '^FIREBASE_API_KEY=.' "$ENV_FILE"; then
@@ -37,10 +37,10 @@ today_ready() {
     import {db} from "./db.mjs";
     import {loadToday} from "./today.mjs";
     try {
-      for (const role of ["admin", "student"]) {
-        await loadToday(db, {id: "00000000-0000-4000-8000-000000000001", role});
+      for (const role of ["admin", "teacher", "assistant", "student"]) {
+        await loadToday(db, {id: "00000000-0000-4000-8000-000000000001", role, permissions: {homework: true, records: true, publish: true, reports: true}});
       }
-      console.log("TODAY_OK: admin and student queries passed");
+      console.log("TODAY_OK: admin, teacher, assistant and student queries passed");
     } catch (error) {
       console.error("TODAY_FAILED", error.code || "UNKNOWN", error.message);
       process.exitCode = 1;
@@ -53,7 +53,7 @@ ready 7041
 today_ready "$TEST"
 docker exec "$TEST" sh -c 'test -w /data/chat-files'
 docker rm -f "$TEST"
-BACKUP="api704-pre-v0334-$(date +%Y%m%d-%H%M%S)"
+BACKUP="api704-pre-v0340-$(date +%Y%m%d-%H%M%S)"
 docker stop api704
 docker rename api704 "$BACKUP"
 rollback() {
@@ -65,7 +65,7 @@ rollback() {
 if docker create --name api704 --network 1panel-network --restart unless-stopped \
   -p 127.0.0.1:7040:7040 --env-file "$ENV_FILE" \
   -v "$ROOT/uploads:/data/chat-files" "$IMAGE" && docker start api704 && ready 7040 && today_ready api704; then
-  echo "DEPLOY_OK v0.33.4; BACKUP=$BACKUP"
+  echo "DEPLOY_OK v0.34.0; BACKUP=$BACKUP"
 else
   rollback
   exit 1
