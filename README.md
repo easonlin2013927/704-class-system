@@ -232,6 +232,10 @@ bash /data/704-class-system/source/deploy/update-api.sh
 腳本先在 7041 連接埠檢查新版，切換失敗會還原上一個容器；上傳目錄持續掛載在硬碟。
 
 Google 登入流程依據 [Firebase 官方文件](https://firebase.google.com/docs/auth/web/google-signin)，後端依 [ID token 驗證規則](https://firebase.google.com/docs/auth/admin/verify-id-tokens) 驗證簽章及身分。
+## 郵件測試報表（v0.33.2）
+
+郵件報表區分「歷史上因通知關閉而取消」與「目前通知開關」。開啟通知不會自動重送已取消的舊郵件，請重新建立測試。匯出時重新讀取狀態，Excel 提供詳細原因、處理建議、錯誤代碼、失敗次數與時間，並以不同顏色區分狀態。SMTP 接受不代表已進入收件匣或已閱讀；舊紀錄只有單一代碼時，系統會明確說明無法確定詳細原因。
+
 ## 登入與郵件外觀（v0.33.1）
 
 三個供應商登入按鈕使用系統主題色，等寬排列於同一排。通知郵件統一使用黑白灰、細邊框與線條分隔，保留純文字版本。前端更新 Pages 後生效；郵件需更新 API，已寄出的郵件不會更改。
