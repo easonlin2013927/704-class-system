@@ -19,7 +19,7 @@ async function request(path, options = {}) {
   if (!response.ok) {
     if(response.status===401&&!['/login','/auth/firebase','/public/auth-config'].includes(path)){token=null;window.dispatchEvent(new Event("session-expired"));}
     if(data.code==="PASSWORD_CHANGE_REQUIRED")window.dispatchEvent(new Event("password-required"));
-    throw Object.assign(new Error(data.message || "雲端操作失敗，請稍後重試。"),{code:data.code});
+    throw Object.assign(new Error(data.message || "雲端操作失敗，請稍後重試。"),{code:data.code,status:response.status});
   }
   if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:true}}));
   return data;
@@ -28,14 +28,17 @@ async function request(path, options = {}) {
 export const cloud = {
   async loginData(profile,onAccess=()=>{}){
     const restricted=profile.must_change_password||profile.must_add_email||profile.must_change_email;
+    const accessReady=cloud.school('permissions').catch(()=>null).then(access=>{onAccess(access);return access;});
+    try{
     const [access,preferences,mailboxes,announcements,countdowns]=await Promise.all([
-      cloud.school('permissions').catch(()=>null).then(access=>{onAccess(access);return access;}),
+      accessReady,
       cloud.school('preferences').catch(()=>null),
       profile.must_change_password?null:cloud.school('mailboxes').catch(()=>null),
       restricted?[]:cloud.list(),
       restricted?[]:cloud.countdowns(),
     ]);
     return {access,preferences,mailboxes,announcements,countdowns};
+    }catch(error){await accessReady;throw error;}
   },
   authConfig(){return request('/public/auth-config');},
   providers(){return request('/account/providers');},
@@ -116,7 +119,7 @@ export const cloud = {
     await request("/announcements/" + encodeURIComponent(id), { method: "DELETE" });
   },
   status() { return request("/admin/status"); },
-  me(){return request("/me");},
+  me(signal){return request("/me",{signal});},
   saveProfile(value){return request("/me",{method:"PATCH",body:JSON.stringify(value)});},
   comments(id){return request("/announcements/"+encodeURIComponent(id)+"/comments");},
   addComment(id,content){return request("/announcements/"+encodeURIComponent(id)+"/comments",{method:"POST",body:JSON.stringify({content})});},

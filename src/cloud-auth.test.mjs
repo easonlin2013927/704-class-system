@@ -33,4 +33,12 @@ await cloud.unlinkProvider('microsoft',{current_password:'fixture-password'});
 await cloud.loginFirebase('microsoft-token','teacher',true,'microsoft');
 assert.deepEqual(exchanges.at(-1),{token:'microsoft-token',portal:'teacher',remember:true,provider:'microsoft'});
 assert.deepEqual(await cloud.school('permissions'),{ok:true},'Provider management must retain the local bearer token');
+const controller=new AbortController();
+globalThis.fetch=async(url,options)=>{
+ assert.ok(url.endsWith('/me'));
+ assert.equal(options.signal,controller.signal,'Session lookup must support cancellation');
+ return new Response(JSON.stringify({message:'Session expired'}),{status:401});
+};
+await assert.rejects(cloud.me(controller.signal),error=>error.status===401&&error.message==='Session expired');
+assert.ok(events.includes('session-expired'));
 console.log('Shared auth module and Google exchange regression checks passed');

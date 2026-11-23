@@ -2,13 +2,13 @@ import {mountAccountProviders} from './account-providers.js';
 import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
 import { mountProviderLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.34.0";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.34.0';
-import {mountMailboxes} from './mailboxes.js?v=0.34.0';
-import {mountMailTest} from './mail-test.js?v=0.34.0';
-import { portals, portalRole } from "./portal.js?v=0.34.0";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.34.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.34.0';
+import { initConnectivityGuard } from "./connectivity.js?v=0.34.1";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.34.1';
+import {mountMailboxes} from './mailboxes.js?v=0.34.1';
+import {mountMailTest} from './mail-test.js?v=0.34.1';
+import { portals, portalRole } from "./portal.js?v=0.34.1";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.34.1";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.34.1';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 
 initConnectivityGuard();
@@ -29,6 +29,7 @@ window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();ins
 window.addEventListener('appinstalled',()=>{installPrompt=null;render();});
 function renderInstallGuide(){const role=activeRole==='teacher'?'教師端':'學生端',appName=`704${activeRole==='teacher'?'教師':'學生'}`;document.title=`${role}安裝｜704班級系統`;app.innerHTML=`<main class="install-gate"><section class="install-card"><div class="install-brand"><img src="./src/logo.svg" width="96" height="96" alt=""><div><span>704 CLASS SYSTEM</span><strong>704班級系統</strong></div></div><p class="install-kicker">${role}專用應用程式</p><h1>從應用程式進入班級系統</h1><p>已安裝時，請從主畫面或應用程式清單開啟「${appName}」。尚未安裝時，使用下方按鈕或瀏覽器的安裝功能。</p><div class="install-actions">${installPrompt?'<button class="primary-button" id="install-pwa">安裝 '+appName+'</button>':''}<a class="secondary-button" href="https://github.com/easonlin2013927/704-class-system/wiki" target="_blank" rel="noopener">查看安裝說明</a></div><p class="install-ios">iPhone／iPad：在 Safari 按「分享」→「加入主畫面」。</p></section></main>`;document.querySelector('#install-pwa')?.addEventListener('click',async()=>{if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;render();}});}
 window.addEventListener("hashchange", () => {
+  cancelSessionRestore();
   cloud.logout();
   state.session = null;
   state.schoolView = 'home';
@@ -52,6 +53,8 @@ const categories = {
 
 const state = {
   session: null,
+  sessionRestore: 'checking',
+  sessionRestoreError: '',
   settingsOpen: false,
   settingsTab: "personal",
   themePreview: null,
@@ -71,6 +74,47 @@ const state = {
 };
 
 const app = document.querySelector("#app");
+let sessionRestoreSequence=0,sessionRestoreController=null;
+function cancelSessionRestore(){
+ sessionRestoreSequence++;
+ sessionRestoreController?.abort();
+ sessionRestoreController=null;
+ state.sessionRestore='ready';state.sessionRestoreError='';
+}
+function renderSessionRestore(){
+ document.title='704班級系統';
+ if(state.sessionRestore==='checking'){
+  app.innerHTML='<main class="boot-screen" role="status" aria-live="polite"><div><span aria-hidden="true"></span>正在恢復登入狀態…</div></main>';
+  return;
+ }
+ app.innerHTML=`<main class="boot-screen"><section class="editor-card"><h1>暫時無法確認登入狀態</h1><p role="alert">${escapeHtml(state.sessionRestoreError)}</p><div class="school-actions"><button class="secondary-button" id="session-restore-retry">重新確認</button><button class="secondary-button" id="session-restore-sign-in">使用帳號密碼登入</button></div></section></main>`;
+ document.querySelector('#session-restore-retry').onclick=restoreSession;
+ document.querySelector('#session-restore-sign-in').onclick=()=>{cancelSessionRestore();render();};
+}
+async function restoreSession(){
+ sessionRestoreController?.abort();
+ const sequence=++sessionRestoreSequence,role=activeRole,controller=new AbortController();
+ sessionRestoreController=controller;
+ const current=()=>sequence===sessionRestoreSequence&&role===activeRole;
+ state.sessionRestore='checking';state.sessionRestoreError='';render();
+ const timeout=setTimeout(()=>controller.abort(),15000);
+ try{
+  const profile=await cloud.me(controller.signal);
+  clearTimeout(timeout);
+  if(!current())return;
+  if((profile.role==='assistant'?'teacher':profile.role)!==role){state.sessionRestore='ready';render();return;}
+  await finishLogin(profile,current);
+ }catch(error){
+  if(!current())return;
+  state.sessionRestore=error.status===401?'ready':'error';
+  state.sessionRestoreError=controller.signal.aborted?'確認登入逾時，請重新確認或選擇帳號密碼登入。':error.message;
+  render();
+ }finally{
+  clearTimeout(timeout);
+  if(sessionRestoreController===controller)sessionRestoreController=null;
+  if(current()&&state.sessionRestore==='checking'){state.sessionRestore='ready';render();}
+ }
+}
 let pendingOperations=0;
 window.addEventListener('operation-start',()=>{pendingOperations++;let el=document.querySelector('#operation-progress');if(!el){el=document.createElement('div');el.id='operation-progress';el.setAttribute('role','status');el.textContent='處理中，請稍候…';document.body.append(el);}el.hidden=false;});
 window.addEventListener('operation-end',()=>{pendingOperations=Math.max(0,pendingOperations-1);const el=document.querySelector('#operation-progress');if(el&&!pendingOperations)el.hidden=true;});
@@ -143,6 +187,7 @@ function render() {
   document.body.classList.toggle('has-wallpaper',validWallpaper);
   if(validWallpaper)document.body.style.setProperty('--user-wallpaper',`url("${wallpaper}")`);else document.body.style.removeProperty('--user-wallpaper');
   if(activeRole!=='admin'&&!isPwaWindow())return renderInstallGuide();
+  if (!state.session && state.sessionRestore!=='ready') return renderSessionRestore();
   if (!state.session) return renderLogin();
   if (state.session.must_change_password) return renderPasswordChange();
   if(state.session.must_add_email||state.session.must_change_email){state.settingsOpen=true;state.settingsTab='account';return renderStudentAccount();}
@@ -155,16 +200,20 @@ function render() {
   return renderDashboard();
 }
 
-window.addEventListener("session-expired",()=>{state.session=null;state.settingsOpen=false;state.adminView="dashboard";render();});
+window.addEventListener("session-expired",()=>{cancelSessionRestore();state.session=null;state.settingsOpen=false;state.adminView="dashboard";render();});
 window.addEventListener("password-required",()=>{if(state.session){state.session.must_change_password=true;render();}});
 function renderPasswordChange(){
  app.innerHTML=`<main class="login-shell"><header class="login-masthead"><span class="portal-emblem">704</span><span>704班級系統</span></header><div class="login-center"><section class="login-panel"><div class="login-card"><h2>請更換密碼</h2><p class="muted">${escapeHtml(state.session.name)}，此帳號需要先更換密碼才能繼續使用。</p><form id="change-password-form"><label>目前密碼<input name="current_password" type="password" autocomplete="current-password"></label><label>新密碼<input name="new_password" type="password" autocomplete="new-password"></label><label>確認新密碼<input name="confirmation" type="password" autocomplete="new-password"></label><button class="primary-button wide">儲存新密碼</button></form><button class="secondary-button wide" id="password-logout">登出</button><p id="password-message" role="status"></p></div></section></div></main>`;
- document.querySelector("#password-logout").addEventListener("click",()=>{cloud.logout();state.session=null;render();});
+ document.querySelector("#password-logout").addEventListener("click",()=>{cancelSessionRestore();cloud.logout();state.session=null;render();});
  document.querySelector("#change-password-form").addEventListener("submit",async event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget)),button=event.currentTarget.querySelector("button"),message=document.querySelector("#password-message");if(data.new_password!==data.confirmation){message.textContent="兩次輸入的新密碼不相同";return;}button.disabled=true;try{const profile=await cloud.changePassword(data);state.session={...profile,name:profile.display_name};state.settingsOpen=false;state.adminView="dashboard";state.editingId=null;state.selectedId=null;state.announcements=[];state.countdowns=[];try{state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();}catch(error){toast(error.message,"error");}render();toast("密碼已更新");}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
 }
-async function finishLogin(profile) {
+async function finishLogin(profile,isCurrent) {
+      const sequence=sessionRestoreSequence;
+      isCurrent??=()=>sequence===sessionRestoreSequence;
       if ((profile.role === "assistant" ? "teacher" : profile.role) !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
       const loading=cloud.loginData(profile,access=>{
+        if(!isCurrent())return;
+        state.sessionRestore='ready';state.sessionRestoreError='';
         state.session={...profile,name:profile.display_name,permissions:access?.permissions||{},favorites:[]};
         state.schoolView='home';state.loginLoading=true;
         state.announcements=[];state.countdowns=[];
@@ -173,12 +222,12 @@ async function finishLogin(profile) {
       });
       try{
         const {preferences,mailboxes,announcements,countdowns}=await loading;
-        if(state.session?.id!==profile.id)return;
+        if(!isCurrent()||state.session?.id!==profile.id)return;
         state.session.favorites=preferences?.favorites||[];
         if(mailboxes&&!mailboxes.some(x=>x.verified)&&!state.settingsOpen&&state.schoolView==='home'&&state.editingId===null&&!state.selectedId){state.settingsOpen=true;state.settingsTab='account';render();}
         state.announcements=announcements;state.countdowns=countdowns;
-      }catch(error){if(state.session?.id===profile.id)toast(error.message,'error');}
-      if(state.session?.id!==profile.id)return;
+      }catch(error){if(isCurrent()&&state.session?.id===profile.id)toast(error.message,'error');}
+      if(!isCurrent()||state.session?.id!==profile.id)return;
       state.loginLoading=false;
       if(state.schoolView!=='home'||state.editingId!==null||state.selectedId||state.settingsOpen)return;
       state.selectedId = null;
@@ -341,7 +390,7 @@ function renderAccounts() {
  const result=id?await cloud.updateAccount(id,data):await cloud.createAccount(data);
  if(isAdmin&&id){const permissions={};document.querySelectorAll('[data-permission]').forEach(input=>permissions[input.dataset.permission]=input.checked);if(Object.keys(permissions).length)await cloud.school('permissions/'+id,'PUT',permissions);}
  dialog.close();
- if(result.reauthenticate){cloud.logout();state.session=null;render();toast("帳號已更新，請重新登入");return;}
+ if(result.reauthenticate){cancelSessionRestore();cloud.logout();state.session=null;render();toast("帳號已更新，請重新登入");return;}
  toast(id?"帳號已更新":"帳號已建立");await refresh();
  }catch(error){toast(error.message,"error");}finally{button.disabled=false;}
  });
@@ -364,7 +413,7 @@ function bindHeader() {
   document.querySelector("#open-accounts")?.addEventListener("click",()=>{state.schoolView='home';state.settingsOpen=false;state.adminView="accounts";state.editingId=null;state.selectedId=null;render();});
   document.querySelector('#open-health')?.addEventListener('click',()=>{state.schoolView='home';state.settingsOpen=false;state.adminView='health';state.editingId=null;state.selectedId=null;render();});
   document.querySelectorAll("[data-home]").forEach(button=>button.addEventListener("click",goHome));
-  document.querySelector("#logout")?.addEventListener("click",()=>{cloud.logout();state.schoolView='home';state.session=null;state.settingsOpen=false;state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();refreshBanner();});
+  document.querySelector("#logout")?.addEventListener("click",()=>{cancelSessionRestore();cloud.logout();state.schoolView='home';state.session=null;state.settingsOpen=false;state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();refreshBanner();});
 }
 
 function filteredAnnouncements() {
@@ -866,4 +915,5 @@ function mountBroadcast(){
 render();
 registerPwaInBackground();
 refreshBanner();
-if(activeRole==='admin'||isPwaWindow())cloud.me().then(profile=>{if((profile.role==='assistant'?'teacher':profile.role)!==activeRole)return;return finishLogin(profile);}).catch(()=>{});
+if(activeRole==='admin'||isPwaWindow())restoreSession();
+else state.sessionRestore='ready';
