@@ -56,12 +56,13 @@ jobs:
             });
             const deployment_id=deployment.id||deployment.status_url?.split('/').pop();
             if(!deployment_id)throw new Error('Pages deployment returned no ID');
+            core.info('Pages deployment ID: '+deployment_id+'; artifact ID: '+artifactId);
             core.setOutput('page_url',deployment.page_url);
             const failures=new Set(['deployment_failed','deployment_perms_error','deployment_content_failed','deployment_cancelled','deployment_lost']);
             for(let attempt=0;attempt<60;attempt++){
               const {data}=await github.request('GET /repos/{owner}/{repo}/pages/deployments/{deployment_id}',{owner,repo,deployment_id});
               if(data.status==='succeed')return;
-              if(failures.has(data.status))throw new Error('Pages deployment: '+data.status);
+              if(failures.has(data.status))throw new Error('Pages deployment: '+JSON.stringify({status:data.status,error:data.error}));
               await new Promise(resolve=>setTimeout(resolve,5000));
             }
             await github.request('POST /repos/{owner}/{repo}/pages/deployments/{deployment_id}/cancel',{owner,repo,deployment_id}).catch(()=>{});
