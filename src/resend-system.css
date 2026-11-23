@@ -298,7 +298,7 @@
 .provider-logo-glyph{background:currentColor;mask:url('./github-logo.svg') center/contain no-repeat;-webkit-mask:url('./github-logo.svg') center/contain no-repeat}
 .login-provider-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:18px 0 12px}
 .login-provider-buttons .google-auth-button{width:100%;min-width:0;height:88px;padding:10px 4px;flex-direction:column;gap:6px;font-size:12px;line-height:1.35;white-space:normal}
-.login-provider-buttons .provider-button-label{min-width:0;max-width:100%;overflow-wrap:normal}
+.login-provider-buttons .provider-button-label{min-width:0;max-width:100%;min-height:2.7em;word-break:keep-all;overflow-wrap:normal}
 
 .provider-row button,[data-provider-confirm],[data-provider-cancel]{min-height:44px}
 
