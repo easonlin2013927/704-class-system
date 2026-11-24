@@ -15,6 +15,7 @@ const styles = [
   "login-layout.css",
   "v025.css",
   "resend-system.css",
+  "board-honors.css",
   "offline.css",
 ];
 

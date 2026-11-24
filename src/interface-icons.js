@@ -1,4 +1,7 @@
 const paths = {
+  back: '<path d="m10 5-7 7 7 7M3 12h18"/>',
+  plus: '<path d="M12 4v16M4 12h16"/>',
+  move: '<path d="M12 3v18M3 12h18m-13-5 4-4 4 4m-8 10 4 4 4-4M7 8l-4 4 4 4m10-8 4 4-4 4"/>',
   today: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4m8-4v4M3 10h18"/><path class="icon-motion" d="M8 14h3m-3 3h7"/>',
   home: '<path d="m3 11 9-7 9 7"/><path d="M5 10v10h14V10M9 20v-6h6v6"/>',
   announcement: '<path d="M4 13V9l12-5v14L4 13Z"/><path class="icon-motion" d="M16 8h3m-3 4h5m-5 4h3"/><path d="m6 14 1 6h4l-2-5"/>',

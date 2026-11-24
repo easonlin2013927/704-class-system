@@ -2,8 +2,8 @@ import { cloud } from './cloud.js';
 import {renderBoard,renderCollections,renderHonors} from './classroom.js';
 import { renderChat } from './chat.js?v=0.29.1';
 import {lineIcon,navigationIcon} from './interface-icons.js';
-let poll=null;
-export function disposeSchool(){if(poll)clearInterval(poll);poll=null;}
+let poll=null,disposeView=null;
+export function disposeSchool(){if(poll)clearInterval(poll);poll=null;disposeView?.();disposeView=null;}
 const esc=(s='')=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const can=(u,key)=>u.role==='admin'||u.permissions?.[key]===true;
 const staff=u=>u._capability?can(u,u._capability):can(u,'publish')||can(u,'homework'),teacher=u=>u._capability?can(u,u._capability):can(u,'grades')||can(u,'records')||can(u,'reports')||can(u,'points');
@@ -41,7 +41,7 @@ export async function mountSchool({node,user,view,notify,navigate,create}){
  node.addEventListener('click',e=>{if(e.target.closest('[data-close]'))e.target.closest('dialog').close();});
  node.addEventListener('click',e=>{const b=e.target.closest('[data-pick]');if(!b)return;const box=b.closest('fieldset,.bulk-selection'),checks=b.dataset.pickSelector?[...node.querySelectorAll(b.dataset.pickSelector)]:box.classList.contains('bulk-selection')?[...node.querySelectorAll('[data-grade-select],[data-homework-select],[data-record-select],[data-chat-select]')]:[...box.querySelectorAll('input[type="checkbox"]:not(:disabled)')];checks.forEach(x=>x.checked=b.dataset.pick==='all');const count=box.querySelector('[data-picked-count]');if(count)count.textContent=`已選 ${checks.filter(x=>x.checked).length} 項`;});
  node.addEventListener('change',e=>{if(!e.target.matches('fieldset input[type="checkbox"],[data-grade-select],[data-homework-select],[data-record-select],[data-chat-select]'))return;const box=e.target.closest('fieldset')||node.querySelector('.bulk-selection'),count=box?.querySelector('[data-picked-count]'),checks=e.target.closest('fieldset')?[...box.querySelectorAll('input[type="checkbox"]:checked')]:[...node.querySelectorAll('[data-grade-select]:checked,[data-homework-select]:checked,[data-record-select]:checked,[data-chat-select]:checked')];if(count)count.textContent=`已選 ${checks.length} 項`;});
- try{const handler=({today:todayCenter,board:renderBoard,collections:renderCollections,honors:renderHonors,search:globalSearch,'report-center':reportCenter,'chat-safety':chatSafety,grades,adminchat,homework:book,records,subjects,chat:renderChat,moderation,reports,points}[view]||book),capability={grades:'grades',homework:'homework',records:'records',reports:'reports',points:'points',subjects:'subjects',adminchat:'chat_moderation',moderation:'chat_moderation'}[view],elevated=(view==='subjects'&&can(user,'subjects'))||(['adminchat','moderation'].includes(view)&&can(user,'chat_moderation'));await handler({...ctx,user:{...user,_capability:capability,...(elevated?{role:'admin'}:{})}});}catch(e){if(node.isConnected)node.innerHTML=empty(esc(e.message));}
+ try{const handler=({today:todayCenter,board:renderBoard,collections:renderCollections,honors:renderHonors,search:globalSearch,'report-center':reportCenter,'chat-safety':chatSafety,grades,adminchat,homework:book,records,subjects,chat:renderChat,moderation,reports,points}[view]||book),capability={grades:'grades',homework:'homework',records:'records',reports:'reports',points:'points',subjects:'subjects',adminchat:'chat_moderation',moderation:'chat_moderation'}[view],elevated=(view==='subjects'&&can(user,'subjects'))||(['adminchat','moderation'].includes(view)&&can(user,'chat_moderation'));const cleanup=await handler({...ctx,user:{...user,_capability:capability,...(elevated?{role:'admin'}:{})}});if(typeof cleanup==='function'){if(node.isConnected)disposeView=cleanup;else cleanup();}}catch(e){if(node.isConnected)node.innerHTML=empty(esc(e.message));}
 }
 async function todayCenter(ctx){
  const {node,user,navigate}=ctx;

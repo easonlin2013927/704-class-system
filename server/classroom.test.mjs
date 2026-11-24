@@ -12,7 +12,7 @@ test('Classroom PostgreSQL routes, permissions, reminders, receipts and offline 
  const db={query,connect:async()=>({query,release(){}})},tools=createClassroom(db);
  const admin={id:randomUUID(),role:'admin',display_name:'管理員'},teacher={id:randomUUID(),role:'teacher',display_name:'教師',permissions:{board_reply:true,collections:true}},assistant={id:randomUUID(),role:'assistant',display_name:'小老師',permissions:{board_reply:true}},student={id:randomUUID(),role:'student',display_name:'學生甲'},other={id:randomUUID(),role:'student',display_name:'學生乙'},noMail={id:randomUUID(),role:'student',display_name:'學生丙'};
  try{
-  await pg.exec(`create table accounts704(id uuid primary key,display_name text,role text,nickname text default '',disabled boolean default false);
+  await pg.exec(`create table accounts704(id uuid primary key,display_name text,role text,nickname text default '',avatar_url text default '',disabled boolean default false);
    create table school_presence(account_id uuid primary key references accounts704(id),last_seen timestamptz default now());
    create table school_rooms(id uuid primary key,title text,kind text,created_at timestamptz default now());
    create table school_members(room_id uuid references school_rooms(id),account_id uuid references accounts704(id),primary key(room_id,account_id));
@@ -26,7 +26,10 @@ test('Classroom PostgreSQL routes, permissions, reminders, receipts and offline 
   await tools.migrate();await tools.migrate();
   const call=async(user,path,method='GET',body={})=>{let value;const u=new URL('http://test/school/'+path);assert.equal(await tools.routes({user,path:u.pathname,query:u.searchParams,method,readBody:async()=>body,send:(status,data)=>value={status,data}}),true);return value.data;};
   const post=await call(student,'board','POST',{content:'今天的心情 <script>alert(1)</script>'});
-  await assert.rejects(call(teacher,'board','POST',{content:'staff'}),{status:403});
+  const teacherNote=await call(teacher,'board','POST',{content:'教師的便利貼',position_x:.1,position_y:.2});await call(teacher,'board/'+teacherNote.id,'PATCH',{position_x:.2,position_y:.3});await call(teacher,'board/'+teacherNote.id,'DELETE');
+  await call(student,'board/'+post.id,'PATCH',{position_x:.25,position_y:.75});assert.equal((await call(student,'board'))[0].position_x,.25);
+  for(const outsider of [other,teacher,admin])await assert.rejects(call(outsider,'board/'+post.id,'PATCH',{position_x:.2,position_y:.2}),{status:403});
+  for(const value of [-1,1.1,'0.2',null])await assert.rejects(call(student,'board/'+post.id,'PATCH',{position_x:value,position_y:.2}),{status:400});
   await assert.rejects(call(other,`board/${post.id}/replies`,'POST',{content:'未授權'}),{status:403});
   await call(assistant,`board/${post.id}/replies`,'POST',{content:'小老師回覆'});
   await call({...other,permissions:{board_reply:true}},`board/${post.id}/replies`,'POST',{content:'授權學生回覆'});
@@ -100,6 +103,18 @@ test('Classroom PostgreSQL routes, permissions, reminders, receipts and offline 
   assert.equal((await query('select handled from school_chat_notices where message_id=$1',[late])).rows[0].handled,false,'Online unread notices wait for read or expired heartbeat');
   await query("update school_presence set last_seen=now()-interval '3 minutes' where account_id=$1",[other.id]);await query("update school_chat_notices set ready_at=now()-interval '1 minute'");await tools.scheduleChat();
   assert.equal((await query("select * from school_mail_queue where kind='offline-chat'")).rows.length,2,'Closed clients receive mail after heartbeat expiry');
+  const defaultHonors=await call(student,'honors');assert.equal(defaultHonors.published,false);assert.equal(defaultHonors.candidates.length,0);
+  const ranking={title:'第一次段考',top_count:1,winners:[student.id]};
+  for(const outsider of [student,assistant,{...other,permissions:{publish:true,accounts:true,collections:true}}])await assert.rejects(call(outsider,'honors','PUT',ranking),{status:403});
+  await call(teacher,'honors','PUT',ranking);assert.equal((await call(student,'honors')).winners[0].student_id,student.id);
+  for(const invalid of [{...ranking,top_count:2},{...ranking,top_count:3,winners:[student.id,student.id,other.id]},{...ranking,winners:[teacher.id]}])await assert.rejects(call(teacher,'honors','PUT',invalid),{status:400});
+  assert.equal((await call(student,'honors')).top_count,1,'Invalid configuration leaves previous published ranking intact');
+  await call(teacher,'honors','PUT',{title:'前三名',top_count:3,winners:[other.id,student.id,noMail.id]});
+  await query('update accounts704 set nickname=$2,avatar_url=$3 where id=$1',[other.id,'小星星','https://example.test/avatar.png']);
+  const liveHonors=await call(student,'honors');assert.equal(liveHonors.winners[0].nickname,'小星星');assert.equal(liveHonors.winners[0].avatar_url,'https://example.test/avatar.png');
+  const extra=[randomUUID(),randomUUID()];for(const id of extra)await query("insert into accounts704(id,display_name,role) values($1,'新同學','student')",[id]);
+  await call(admin,'honors','PUT',{title:'前五名',top_count:5,winners:[student.id,other.id,noMail.id,...extra]});
+  const five=await call(teacher,'honors');assert.deepEqual(five.winners.map(row=>row.rank),[1,2,3,4,5]);assert.equal(five.candidates.length,5);
   await call(student,'board/'+post.id,'DELETE');assert.equal((await call(admin,'board')).length,0);
  }finally{await pg.close();}
 });

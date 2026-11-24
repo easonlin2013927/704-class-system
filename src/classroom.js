@@ -4,36 +4,14 @@ import {lineIcon} from './interface-icons.js';
 const api=(path,method='GET',body)=>cloud.school(path,method,body);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const can=(user,key)=>user.role==='admin'||user.permissions?.[key]===true;
-const stamp=value=>new Date(value).toLocaleString('zh-TW');
 const date=value=>String(value||'').slice(0,10);
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const button=(label,attrs='')=>`<button type="button" class="secondary-button" ${attrs}>${label}</button>`;
 const heading=(title,description,icon)=>`<div class="school-heading"><div class="title-copy"><div class="title-lockup"><span class="page-title-icon">${lineIcon(icon,22)}</span><h1>${title}</h1></div><p class="muted">${description}</p></div></div>`;
 const submit=(form,ctx,action)=>{form.onsubmit=ctx.safe(async event=>{event.preventDefault();const control=form.querySelector('[type="submit"]');if(control.disabled)return;control.disabled=true;try{await action(new FormData(form));}finally{control.disabled=false;}});};
 
-export function renderHonors({node}){
- node.innerHTML=heading('段考英雄榜','班級段考表現與學習成果。','points')+'<section class="editor-card"><span class="school-tag">尚未完成 · 暫不開放</span><h2>功能準備中</h2><p class="muted">目前不提供排名，也不會公開任何學生成績。</p></section>';
-}
-
-export async function renderBoard(ctx){
- const {node,user,notify}=ctx,reply=can(user,'board_reply');
- const rows=await api('board');if(!node.isConnected)return;
- node.innerHTML=heading('班級留言板','這裡是全班可見的公開心情留言板。請尊重同學，避免留下密碼、聯絡資訊或其他私密資料。','chat')+
-  (user.role==='student'?'<form id="board-compose" class="editor-card"><label>今天想分享什麼？<textarea name="content" rows="4" maxlength="2000" required placeholder="寫下你的心情或想與班級分享的事…"></textarea></label><button type="submit" class="primary-button">公開留言</button></form>':'<p class="muted">學生可留言；你可以選擇回覆，或保留留言不作處理。</p>')+
-  `<div class="school-actions">${button('重新整理','data-board-refresh')}</div><div id="board-posts" class="school-stack"></div>${button('載入更早留言','data-board-more hidden')}`;
- const target=node.querySelector('#board-posts'),more=node.querySelector('[data-board-more]');let last='';
- const draw=posts=>{
-  target.insertAdjacentHTML('beforeend',posts.map(post=>`<article class="editor-card board-post"><header><strong>${esc(post.author_name)}</strong><time>${esc(stamp(post.created_at))}</time></header><p class="classroom-text">${esc(post.content)}</p><section class="board-replies" aria-label="留言回覆">${post.replies.map(row=>`<article><header><strong>${esc(row.author_name)}</strong><time>${esc(stamp(row.created_at))}</time></header><p class="classroom-text">${esc(row.content)}</p></article>`).join('')||'<p class="muted">尚無回覆</p>'}</section>${reply?`<form data-board-reply="${post.id}"><label>回覆 ${esc(post.author_name)}<textarea name="content" rows="2" maxlength="2000" required></textarea></label><button type="submit" class="secondary-button">公開回覆</button></form>`:''}${post.author_id===user.id||['admin','teacher'].includes(user.role)?button('刪除留言',`data-board-delete="${post.id}"`):''}</article>`).join(''));
-  if(!target.children.length)target.innerHTML='<p class="school-empty">還沒有留言，歡迎分享今天的心情。</p>';
-  last=posts.at(-1)?.id||last;more.hidden=posts.length<50;
-  target.querySelectorAll('[data-board-reply]').forEach(form=>submit(form,ctx,async data=>{await api('board/'+form.dataset.boardReply+'/replies','POST',{content:data.get('content')});notify('回覆已公開');await renderBoard(ctx);}));
-  target.querySelectorAll('[data-board-delete]').forEach(control=>control.onclick=ctx.safe(async()=>{if(control.dataset.confirm!=='yes'){control.dataset.confirm='yes';control.textContent='再次點擊確認刪除';return;}await api('board/'+control.dataset.boardDelete,'DELETE');notify('留言已刪除');await renderBoard(ctx);}));
- };
- draw(rows);
- const form=node.querySelector('#board-compose');if(form)submit(form,ctx,async data=>{await api('board','POST',{content:data.get('content')});notify('留言已公開');await renderBoard(ctx);});
- node.querySelector('[data-board-refresh]').onclick=ctx.safe(()=>renderBoard(ctx));
- more.onclick=ctx.safe(async()=>{more.disabled=true;try{draw(await api('board?before='+encodeURIComponent(last)));}finally{more.disabled=false;}});
-}
+export {renderBoard} from './board.js';
+export {renderHonors} from './honors.js';
 
 const statuses={missing:'未繳交',submitted:'已繳交',excluded:'排除'};
 export async function renderCollections(ctx){

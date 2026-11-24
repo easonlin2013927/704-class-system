@@ -2,13 +2,13 @@ import {mountAccountProviders} from './account-providers.js';
 import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
 import { mountProviderLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.36.0";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.36.0';
-import {mountMailboxes} from './mailboxes.js?v=0.36.0';
-import {mountMailTest} from './mail-test.js?v=0.36.0';
-import { portals, portalRole } from "./portal.js?v=0.36.0";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.36.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.36.0';
+import { initConnectivityGuard } from "./connectivity.js?v=0.37.0";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.37.0';
+import {mountMailboxes} from './mailboxes.js?v=0.37.0';
+import {mountMailTest} from './mail-test.js?v=0.37.0';
+import { portals, portalRole } from "./portal.js?v=0.37.0";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.37.0";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.37.0';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 import {isAppWindow,pwaDisplayModes} from './pwa.js';
 
@@ -424,7 +424,7 @@ function renderAccounts() {
 }
 
 function navigateSchool(view,create=null){state.schoolView=view;state.schoolCreate=create;state.selectedId=null;state.editingId=null;state.settingsOpen=false;state.adminView='dashboard';render();}
-function renderSchool(){app.innerHTML=`${headerTemplate()}<main id="main-content" class="page-shell school-shell" tabindex="-1"><div id="school-page"></div></main>`;bindHeader();mountSchool({node:document.querySelector('#school-page'),user:state.session,view:state.schoolView,create:state.schoolCreate,notify:toast,navigate:navigateSchool});state.schoolCreate=null;}
+function renderSchool(){const board=state.schoolView==='board';app.innerHTML=board?'<main id="main-content" class="board-scene-shell" tabindex="-1"><div id="school-page" style="height:100%"></div></main>':`${headerTemplate()}<main id="main-content" class="page-shell school-shell" tabindex="-1"><div id="school-page"></div></main>`;if(!board)bindHeader();mountSchool({node:document.querySelector('#school-page'),user:state.session,view:state.schoolView,create:state.schoolCreate,notify:toast,navigate:navigateSchool});state.schoolCreate=null;}
 function goHome(){navigateSchool('home');}
 function bindHeader() {
   bindIconMotion(document.querySelector('#app'));
