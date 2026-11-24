@@ -15,7 +15,7 @@ function createOfflineScreen() {
   screen.setAttribute('aria-live', 'assertive');
   screen.innerHTML = `
     <div class="offline-card">
-      <img class="offline-logo" src="./src/logo.svg" width="88" height="88" alt="704 班級系統">
+      <svg class="offline-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18M2 9a16 16 0 0 1 3-2M9 5.3A16 16 0 0 1 22 9M5 13a11 11 0 0 1 3-2M13 10a11 11 0 0 1 6 3M8.5 16.5a5 5 0 0 1 7 0M12 20h.01"/></svg>
       <p class="offline-eyebrow">CONNECTION LOST</p>
       <h1>目前沒有網際網路</h1>
       <p>無法連接班級系統。請檢查 Wi-Fi、行動網路或網路線，重新連線後系統會自動回到原本的畫面。</p>

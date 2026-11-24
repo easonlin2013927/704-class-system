@@ -2,14 +2,15 @@ import {mountAccountProviders} from './account-providers.js';
 import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
 import { mountProviderLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.34.1";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.34.1';
-import {mountMailboxes} from './mailboxes.js?v=0.34.1';
-import {mountMailTest} from './mail-test.js?v=0.34.1';
-import { portals, portalRole } from "./portal.js?v=0.34.1";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.34.1";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.34.1';
+import { initConnectivityGuard } from "./connectivity.js?v=0.34.2";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.34.2';
+import {mountMailboxes} from './mailboxes.js?v=0.34.2';
+import {mountMailTest} from './mail-test.js?v=0.34.2';
+import { portals, portalRole } from "./portal.js?v=0.34.2";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.34.2";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.34.2';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
+import {isAppWindow,pwaDisplayModes} from './pwa.js';
 
 initConnectivityGuard();
 
@@ -23,10 +24,24 @@ function registerPwaInBackground(){
   else setTimeout(register,1200);
 }
 setupPwa(activeRole);
-const isPwaWindow=()=>['127.0.0.1','localhost'].includes(location.hostname)||matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+let pwaWindow=false,pwaSessionStarted=false,pwaContextReady=false;
+const isPwaWindow=()=>pwaWindow||= ['127.0.0.1','localhost'].includes(location.hostname)||isAppWindow();
+function renderPwaCheck(){app.innerHTML='<main class="boot-screen" data-pwa-check role="status"><div><span aria-hidden="true"></span>正在確認應用程式視窗…</div></main>';}
+function syncPwaContext(){
+ if(!isPwaWindow())return;
+ if(!pwaSessionStarted){pwaSessionStarted=true;restoreSession();}
+ else if(document.querySelector('.install-gate')||document.querySelector('[data-pwa-check]'))render();
+}
+for(const mode of pwaDisplayModes){
+ const query=matchMedia(`(display-mode: ${mode})`);
+ if(query.addEventListener)query.addEventListener('change',syncPwaContext);
+ else query.addListener(syncPwaContext);
+}
+window.addEventListener('pageshow',syncPwaContext);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncPwaContext();});
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;if(activeRole!=='admin')render();});
-window.addEventListener('appinstalled',()=>{installPrompt=null;render();});
+window.addEventListener('appinstalled',()=>{installPrompt=null;syncPwaContext();if(!isPwaWindow())render();});
 function renderInstallGuide(){const role=activeRole==='teacher'?'教師端':'學生端',appName=`704${activeRole==='teacher'?'教師':'學生'}`;document.title=`${role}安裝｜704班級系統`;app.innerHTML=`<main class="install-gate"><section class="install-card"><div class="install-brand"><img src="./src/logo.svg" width="96" height="96" alt=""><div><span>704 CLASS SYSTEM</span><strong>704班級系統</strong></div></div><p class="install-kicker">${role}專用應用程式</p><h1>從應用程式進入班級系統</h1><p>已安裝時，請從主畫面或應用程式清單開啟「${appName}」。尚未安裝時，使用下方按鈕或瀏覽器的安裝功能。</p><div class="install-actions">${installPrompt?'<button class="primary-button" id="install-pwa">安裝 '+appName+'</button>':''}<a class="secondary-button" href="https://github.com/easonlin2013927/704-class-system/wiki" target="_blank" rel="noopener">查看安裝說明</a></div><p class="install-ios">iPhone／iPad：在 Safari 按「分享」→「加入主畫面」。</p></section></main>`;document.querySelector('#install-pwa')?.addEventListener('click',async()=>{if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;render();}});}
 window.addEventListener("hashchange", () => {
   cancelSessionRestore();
@@ -186,7 +201,10 @@ function render() {
   const validWallpaper=/^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/.test(wallpaper)||/^https:\/\/[^/]+\/school\/profile-files\/[0-9a-f-]{36}$/i.test(wallpaper);
   document.body.classList.toggle('has-wallpaper',validWallpaper);
   if(validWallpaper)document.body.style.setProperty('--user-wallpaper',`url("${wallpaper}")`);else document.body.style.removeProperty('--user-wallpaper');
-  if(activeRole!=='admin'&&!isPwaWindow())return renderInstallGuide();
+  if(activeRole!=='admin'){
+    if(!isPwaWindow())return pwaContextReady?renderInstallGuide():renderPwaCheck();
+    if(!pwaSessionStarted){queueMicrotask(syncPwaContext);return renderPwaCheck();}
+  }
   if (!state.session && state.sessionRestore!=='ready') return renderSessionRestore();
   if (!state.session) return renderLogin();
   if (state.session.must_change_password) return renderPasswordChange();
@@ -915,5 +933,6 @@ function mountBroadcast(){
 render();
 registerPwaInBackground();
 refreshBanner();
-if(activeRole==='admin'||isPwaWindow())restoreSession();
+if(activeRole==='admin'||isPwaWindow()){pwaSessionStarted=true;restoreSession();}
 else state.sessionRestore='ready';
+setTimeout(()=>{pwaContextReady=true;if(document.querySelector('[data-pwa-check]')){if(isPwaWindow())syncPwaContext();else render();}},250);
