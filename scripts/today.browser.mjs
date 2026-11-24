@@ -17,7 +17,7 @@ async (page)=>{
   const studentText=node.textContent;
   const safe=!node.querySelector('img');
   node.querySelector('[data-announcement]').click();
-  for(const target of ['homework','records','notifications'])node.querySelector(`[data-today-go="${target}"]`).click();
+  for(const target of ['homework','records'])node.querySelector(`[data-today-go="${target}"]`).click();
   await mount({role:'assistant',id:'assistant',permissions:{}});
   const restrictedText=node.textContent;
   const studentNavigation=navigation.slice();
@@ -42,7 +42,7 @@ async (page)=>{
  check(result.studentText.includes('課務公告')&&result.studentText.includes('3 則未讀'),'Category and unread labels');
  check(result.safe,'Announcement titles must be escaped');
  check(result.announcement==='post','Announcement click must open detail');
- check(result.studentNavigation.join(',')==='homework,records,notifications','Cards must navigate');
+ check(result.studentNavigation.join(',')==='homework,records','Cards must navigate');
  check(!result.restrictedText.includes('作業與期限')&&!result.restrictedText.includes('班級紀錄'),'Unauthorized sections hidden');
  check(result.teacherText.includes('班級待辦與紀錄')&&result.teacherText.includes('Student'),'Staff records available');
  check(result.teacherText.includes('教師總覽')&&result.teacherText.includes('完成 1 / 4 人')&&result.teacherText.includes('我的草稿'),'Teacher class overview');

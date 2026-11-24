@@ -10,22 +10,8 @@ export async function migrateMailEvents(){await db.query(`
  alter table school_mail_queue add column if not exists event_kind text;
  create or replace function school_queue_mail_notification() returns trigger language plpgsql as $$ begin if new.external_allowed and new.kind<>'points' and coalesce((select digest_frequency from school_notification_settings where account_id=new.account_id),'immediate')='immediate' then insert into school_mail_queue(id,account_id,kind,title,event_kind) values(gen_random_uuid(),new.account_id,'notification',new.title,new.kind);end if;return new;end $$;
  update school_mail_queue set status='cancelled' where kind='notification' and event_kind='points' and status='pending';
- create or replace function school_offline_message_email() returns trigger language plpgsql as $$
- begin
-  with due as (
-   insert into school_chat_mail_throttle(account_id,last_queued_at)
-   select a.id,now() from school_members m join accounts704 a on a.id=m.account_id left join school_presence p on p.account_id=a.id
-   where m.room_id=new.room_id and a.id is distinct from new.author_id and not a.disabled and coalesce((select chat from school_notification_settings s where s.account_id=a.id),true) and (p.last_seen is null or p.last_seen<now()-interval '2 minutes')
-   on conflict(account_id) do update set last_queued_at=excluded.last_queued_at where school_chat_mail_throttle.last_queued_at<now()-interval '30 minutes'
-   returning account_id
-  ) insert into school_mail_queue(id,account_id,kind,title) select gen_random_uuid(),account_id,'offline-chat','你有新的聊天訊息' from due where coalesce((select external_enabled from school_notification_gate where id=1),true);
-  insert into school_notifications(account_id,kind,title) select a.id,'chat','你有新的聊天訊息' from school_members m join accounts704 a on a.id=m.account_id where m.room_id=new.room_id and a.id is distinct from new.author_id and not a.disabled and not coalesce((select external_enabled from school_notification_gate where id=1),true);
-  return new;
- end $$;
  drop trigger if exists school_offline_message_mail on school_messages;
- create trigger school_offline_message_mail after insert on school_messages for each row execute function school_offline_message_email();
  `);}
-export async function markPresence(user){await db.query('insert into school_presence(account_id,last_seen) values($1,now()) on conflict(account_id) do update set last_seen=now()',[user.id]);return {ok:true};}
 let scheduling=false;
 export async function scheduleWeeklyRanking(){if(scheduling)return;scheduling=true;const client=await db.connect().catch(()=>null);if(!client){scheduling=false;return;}try{
  await client.query('begin');

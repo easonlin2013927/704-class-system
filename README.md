@@ -67,3 +67,7 @@ bash /data/704-class-system/source/deploy/update-api.sh
 ## 問題回報
 
 使用 [Issues](https://github.com/easonlin2013927/704-class-system/issues/new/choose) 回報問題或提出建議。請勿提交密碼、學生個資或名冊。
+
+## 班級互動工具
+
+學生可使用全班公開的心情留言板，教師與獲授權帳號可回覆；資料繳收支援截止日、批次狀態及未繳提醒。聊天支援狀態、已讀及離線郵件，英雄榜目前尚未開放。操作及權限說明見 [班級互動與資料繳收](docs/wiki/Classroom-Tools.md)。

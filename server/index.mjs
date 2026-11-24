@@ -10,14 +10,16 @@ import {migrateMail,mailAddress,mailStatus,requestMailVerification,confirmMailVe
 import {migrateMailboxes,listMailboxes,createMailbox,updateMailbox,deleteMailbox,confirmMailbox} from './mailboxes.mjs';
 import {migrateMailDeliveries,processMultiMail} from './multi-mail-worker.mjs';
 import {createMailTest,getMailTest,latestMailTest} from './mail-tests.mjs';
-import {migrateMailEvents,markPresence,scheduleWeeklyRanking,scheduleDigests} from './mail-events.mjs';
+import {migrateMailEvents,scheduleWeeklyRanking,scheduleDigests} from './mail-events.mjs';
 import {migrateEnhancements,enhancementRoutes,authorizeEnhancedSchoolRoute,publishScheduledAnnouncements,cleanupExpiredChatFiles,serveProfileFile,permissionsFor} from './enhancements.mjs';
 import {migrateSystemCenter} from './system-center.mjs';
+import {createClassroom,markClassPresence} from './classroom.mjs';
 import {createFirebaseAuth,migrateFirebaseAuth} from './firebase-auth.mjs';
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
 const firebaseAuth=createFirebaseAuth(db);
+const classroom=createClassroom(db);
 const categories = new Set(["important","academic","activity","general"]);
 const themes=new Set(["dark","light","ocean","forest","rose","amber","midnight","slate","notebook","lavender","brick","teal","mono"]);
 function profile(account){return {id:account.id,role:account.role,display_name:account.display_name,must_change_password:account.must_change_password,must_add_email:account.must_add_email,must_change_email:account.must_change_email,nickname:account.nickname,theme:account.theme,avatar_url:account.avatar_url,wallpaper_url:account.wallpaper_url};}
@@ -47,6 +49,7 @@ await migrateMail();
 await migrateMailboxes();
 await migrateMailDeliveries();
 await migrateMailEvents();
+await classroom.migrate();
 await migrateSystemCenter();
 await migrateFirebaseAuth(db);
 const generatedPushKeys=webpush.generateVAPIDKeys();
@@ -58,6 +61,8 @@ const pushTimer=setInterval(async()=>{if(pushBusy)return;pushBusy=true;try{const
 pushTimer.unref();
 const broadcastTimer=setInterval(processBroadcasts,3000);broadcastTimer.unref();
 const mailTimer=setInterval(processMultiMail,15000);mailTimer.unref();
+let chatNoticeBusy=false;
+const chatNoticeTimer=setInterval(async()=>{if(chatNoticeBusy)return;chatNoticeBusy=true;try{await classroom.scheduleChat();}catch{console.error('Chat notice scheduling unavailable');}finally{chatNoticeBusy=false;}},15000);chatNoticeTimer.unref();
 const rankingMailTimer=setInterval(scheduleWeeklyRanking,60000);rankingMailTimer.unref();
 scheduleWeeklyRanking();
 const digestMailTimer=setInterval(scheduleDigests,60000);digestMailTimer.unref();
@@ -148,7 +153,7 @@ const server = createServer(async (req,res) => {
  if(providerPath&&req.method==='POST')return send(201,await firebaseAuth.link(user,await body(req),providerPath[1]));
  if(providerPath&&req.method==='DELETE')return send(200,await firebaseAuth.unlink(user,await body(req),providerPath[1]));
  if(path==='/school/mail-address'&&req.method==='GET')return send(200,await mailAddress(user));
- if(path==='/school/presence'&&req.method==='POST')return send(200,await markPresence(user));
+ if(path==='/school/presence'&&req.method==='POST')return send(200,await markClassPresence(db,user,req.headers['content-length']==='0'||(!req.headers['content-length']&&!req.headers['transfer-encoding'])?{}:await body(req)));
   if(path==='/school/mail-status'&&req.method==='GET'){if(!user.permissions.site_settings)fail(403,'此帳號沒有網站設定權限');return send(200,await mailStatus({...user,role:'admin'}));}
  if(path==='/school/mail-address'&&req.method==='POST'){const b=await body(req);return send(202,await requestMailVerification(user,b.address));}
  if(path==='/school/mail-verify'&&req.method==='POST'){const b=await body(req);return send(200,await confirmMailVerification(user,b.code));}
@@ -182,6 +187,7 @@ const server = createServer(async (req,res) => {
  }
  if(path.startsWith('/school/')){
  const query=new URL(req.url,'http://localhost').searchParams;
+ if(await classroom.routes({path,query,method:req.method,user,readBody:()=>body(req),send}))return;
  if(await enhancementRoutes({path,query,method:req.method,user,tokenHash:digest(token),readBody:()=>body(req),send,req,res}))return;
  await authorizeEnhancedSchoolRoute(user,path,req.method);
  return await schoolRoutes({path,query,method:req.method,user,readBody:()=>body(req),send,res});

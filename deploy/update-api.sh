@@ -2,8 +2,8 @@
 set -euo pipefail
 ROOT=/data/704-class-system
 ENV_FILE="$HOME/.config/704-api/mail-0194.env"
-IMAGE=announcement704/704-api:0.34.0
-TEST=api704-v0340-test
+IMAGE=announcement704/704-api:0.36.0
+TEST=api704-v0360-test
 test -f "$ENV_FILE"
 test -d "$ROOT/uploads"
 if ! grep -q '^FIREBASE_API_KEY=.' "$ENV_FILE"; then
@@ -36,10 +36,18 @@ today_ready() {
   docker exec "$1" node --input-type=module -e '
     import {db} from "./db.mjs";
     import {loadToday} from "./today.mjs";
+    import {createClassroom} from "./classroom.mjs";
     try {
       for (const role of ["admin", "teacher", "assistant", "student"]) {
         await loadToday(db, {id: "00000000-0000-4000-8000-000000000001", role, permissions: {homework: true, records: true, publish: true, reports: true}});
+        const user={id:"00000000-0000-4000-8000-000000000001",role,permissions:{collections:true,board_reply:true}};
+        for(const resource of ["board","collections","presence"]){
+          await createClassroom(db).routes({path:"/school/"+resource,method:"GET",user,query:new URLSearchParams(),readBody:async()=>{throw Error("Unexpected write");},send:()=>{}});
+        }
       }
+      await db.query("select last_read_at from school_members limit 0");
+      await db.query("select uploads_pending from school_messages limit 0");
+      console.log("CLASSROOM_OK: board, collections, presence and chat schema passed");
       console.log("TODAY_OK: admin, teacher, assistant and student queries passed");
     } catch (error) {
       console.error("TODAY_FAILED", error.code || "UNKNOWN", error.message);
@@ -53,7 +61,7 @@ ready 7041
 today_ready "$TEST"
 docker exec "$TEST" sh -c 'test -w /data/chat-files'
 docker rm -f "$TEST"
-BACKUP="api704-pre-v0340-$(date +%Y%m%d-%H%M%S)"
+BACKUP="api704-pre-v0360-$(date +%Y%m%d-%H%M%S)"
 docker stop api704
 docker rename api704 "$BACKUP"
 rollback() {
@@ -65,7 +73,7 @@ rollback() {
 if docker create --name api704 --network 1panel-network --restart unless-stopped \
   -p 127.0.0.1:7040:7040 --env-file "$ENV_FILE" \
   -v "$ROOT/uploads:/data/chat-files" "$IMAGE" && docker start api704 && ready 7040 && today_ready api704; then
-  echo "DEPLOY_OK v0.34.0; BACKUP=$BACKUP"
+  echo "DEPLOY_OK v0.36.0; BACKUP=$BACKUP"
 else
   rollback
   exit 1

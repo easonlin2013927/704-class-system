@@ -4,6 +4,14 @@ import {proxyRequest} from './proxy.mjs';
 const origin='https://easonlin2013927.github.io',base='https://example.workers.dev';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json','Cache-Control':'public, max-age=3600','Set-Cookie':'never=forward'}});
 
+test('classroom replies, reminders and chat receipt routes preserve authorization',async()=>{
+ const id='11111111-1111-4111-8111-111111111111';
+ for(const path of [`/school/board/${id}/replies`,`/school/collections/${id}/remind`,`/school/chat-read/${id}`,`/school/chat-sent/${id}`]){
+  const result=await proxyRequest(new Request(base+path,{method:'POST',headers:{Origin:origin,Authorization:'Bearer fixture','Content-Type':'application/json'},body:'{}'}),{fetchUpstream:async(url,options)=>{assert.equal(new URL(url).pathname,path);assert.equal(options.headers.get('Authorization'),'Bearer fixture');return json({ok:true});}});
+  assert.equal(result.status,200);
+ }
+});
+
 test('provider management forwards local authorization without replacing the session cookie',async()=>{
  for(const provider of ['google','github','microsoft'])for(const method of ['GET','POST','DELETE']){
   const path=method==='GET'?'/account/providers':'/account/providers/'+provider;

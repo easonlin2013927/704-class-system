@@ -4,9 +4,10 @@ const kindLabel={announcements:'公告',activity:'活動',homework:'作業',feed
 
 export function buildMail(row){
  const verification=Boolean(row.verification),test=row.kind==='test',broadcast=row.kind==='broadcast',weekly=row.kind==='ranking',chat=row.kind==='offline-chat',digest=row.kind==='digest';
- const heading=verification?'驗證你的電子郵件':test?'測試郵件':weekly?'每週班級排行榜':digest?'班級通知摘要':chat?'你有新的聊天訊息':({'announcements':'有新的公告','activity':'有新的活動','homework':'有新的作業','feedback':'有新的提醒或缺交紀錄','grades':'教師新增了一筆成績','report':'檢舉進度有更新'}[row.event_kind]||'你有一則班級通知');
+ const heading=verification?'驗證你的電子郵件':test?'測試郵件':weekly?'每週班級排行榜':digest?'班級通知摘要':chat?'你有新的聊天訊息':row.kind==='collection'?'資料繳收提醒':({'announcements':'有新的公告','activity':'有新的活動','homework':'有新的作業','feedback':'有新的提醒或缺交紀錄','grades':'教師新增了一筆成績','report':'檢舉進度有更新'}[row.event_kind]||'你有一則班級通知');
  const detail=verification?'請在系統的驗證畫面輸入下方六位數驗證碼，驗證碼有效 5 分鐘。':test?'這是一封來自 704 班級系統的測試郵件。':broadcast?'管理員發布了一則通知：':weekly?'以下是本週五晚間的班級排行榜。':digest?'以下是你選擇期間內尚未錯過的班級動態。':chat?'你離開系統時收到了新訊息，請登入查看。':'請登入班級系統查看詳細內容。';
- const message=broadcast?String(row.title||''):'';
+ let payload={};try{payload=JSON.parse(row.title||'{}');}catch{}
+ const message=broadcast?String(row.title||''):chat&&payload.sender?`${payload.sender} 在 704 班級系統傳送了訊息給你：\n\n${payload.content||''}${Array.isArray(payload.files)&&payload.files.length?'\n\n檔案：\n'+payload.files.map(file=>'• '+file.name+'（'+Number(file.size)+' B）').join('\n'):''}\n\n請盡快登入查看。附件需登入系統後下載，並於上傳三天後到期。`:row.kind==='collection'?`資料繳收提醒：${payload.title||''}\n截止日期：${payload.due_on||''}\n${payload.description||''}\n\n你目前仍標記為未繳交，請盡快繳交；若已完成，請聯絡教師更新狀態。`:'';
  const code=verification?String(row.verification_code||''):'';
  let ranking=[],digestItems=[];
  try{const value=JSON.parse(row.title||'{}');if(weekly&&Array.isArray(value.ranking))ranking=value.ranking;if(digest&&Array.isArray(value.items))digestItems=value.items;}catch{}

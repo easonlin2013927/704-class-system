@@ -10,6 +10,8 @@ test('all mail variants preserve subject, text, content and monochrome HTML',()=
   [{kind:'ranking',title:JSON.stringify({ranking:[{display_name:'學生甲',nickname:'甲',points:12}]})},'每週班級排行榜',['學生甲','12']],
   [{kind:'digest',title:JSON.stringify({items:[{kind:'homework',title:'作業內容'}]})},'班級通知摘要',['作業內容','作業']],
   [{kind:'offline-chat'},'你有新的聊天訊息',['聊天訊息']],
+  [{kind:'offline-chat',title:JSON.stringify({sender:'同學甲',content:'訊息摘要',files:[{name:'附件.pdf',size:123}]})},'你有新的聊天訊息',['同學甲','訊息摘要','附件.pdf']],
+  [{kind:'collection',title:JSON.stringify({title:'同意書',due_on:'2026-12-01',description:'簽名後繳交'})},'資料繳收提醒',['同意書','2026-12-01','簽名後繳交']],
   ...Object.entries({announcements:'有新的公告',activity:'有新的活動',homework:'有新的作業',feedback:'有新的提醒或缺交紀錄',grades:'教師新增了一筆成績',report:'檢舉進度有更新'}).map(([event_kind,heading])=>[{kind:'notification',event_kind},heading,[heading]])
  ];
  for(const [row,heading,values] of variants){

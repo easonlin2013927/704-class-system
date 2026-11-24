@@ -20,7 +20,7 @@ const paths = {
   logout: '<path d="M10 17l5-5-5-5m5 5H3"/><path class="icon-motion" d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/>',
 };
 
-export const navigationIcon = {today:'today',home:'announcement',notifications:'inbox',search:'search',homework:'homework',points:'points',grades:'grades',records:'records',chat:'chat','report-center':'reports','chat-safety':'safety',reports:'reports',subjects:'subjects',moderation:'moderation',adminchat:'chat'};
+export const navigationIcon = {board:'chat',honors:'points',collections:'records',today:'today',home:'announcement',notifications:'inbox',search:'search',homework:'homework',points:'points',grades:'grades',records:'records',chat:'chat','report-center':'reports','chat-safety':'safety',reports:'reports',subjects:'subjects',moderation:'moderation',adminchat:'chat'};
 
 export function lineIcon(name,size=20){
   const path=paths[name]||paths.more;

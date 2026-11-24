@@ -50,7 +50,7 @@ export const cloud = {
     token=result.token;
     return result.profile;
   },
-  presence(){return request('/school/presence',{method:'POST',silent:true});},
+  presence(value={}){return request('/school/presence',{method:'POST',body:JSON.stringify(value),silent:true});},
   school(path,method='GET',value){return request('/school/'+path,{method,...(value===undefined?{}:{body:JSON.stringify(value)})});},
   async downloadBackup(id){
     window.dispatchEvent(new Event('operation-start'));
@@ -86,7 +86,12 @@ export const cloud = {
     }
   },
   async downloadChatAttachment(id){
-    const anchor=document.createElement('a');anchor.href=config.url.replace(/\/$/,'')+'/school/chat-attachments/'+encodeURIComponent(id);anchor.rel='noopener';document.body.append(anchor);anchor.click();anchor.remove();
+    const response=await fetch(config.url.replace(/\/$/,'')+'/school/chat-attachments/'+encodeURIComponent(id),{credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{})},cache:'no-store'});
+    if(!response.ok){const result=await response.json().catch(()=>({}));throw Error(result.message||'聊天附件下載失敗');}
+    let blob,name;
+    if(response.headers.get('Content-Type')?.includes('application/json')&&!response.headers.get('Content-Disposition')?.includes('attachment')){const file=await response.json();name=file.name;const data=Uint8Array.from(atob(file.data),c=>c.charCodeAt(0));blob=new Blob([data],{type:file.type||'application/octet-stream'});}
+    else{blob=await response.blob();const disposition=response.headers.get('Content-Disposition')||'',match=disposition.match(/filename\*=UTF-8''([^;]+)/i);try{name=match?decodeURIComponent(match[1]):'聊天附件';}catch{name='聊天附件';}}
+    const url=URL.createObjectURL(blob),anchor=document.createElement('a');anchor.href=url;anchor.download=name||'聊天附件';document.body.append(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   },
   async uploadProfileFile(kind,file,onProgress=()=>{}){
     if(!['avatar','wallpaper'].includes(kind)||!(file instanceof File))throw new Error('圖片上傳格式錯誤');

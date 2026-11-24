@@ -1,4 +1,4 @@
-name: Publish v0.35.0 release
+name: Publish v0.36.0 release
 on:
   push:
     branches: [main]
@@ -16,12 +16,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node --test server/today.test.mjs server/password.test.mjs server/firebase-auth.test.mjs server/mail-template.test.mjs src/mail-status.test.mjs deploy/worker/proxy.test.mjs && node src/firebase-auth.test.mjs && node src/cloud-auth.test.mjs && node src/login-loading.test.mjs && node src/pwa.test.mjs && node src/interface-icons.test.mjs && node scripts/preview-security.test.mjs
+      - run: node --test server/classroom.test.mjs server/today.test.mjs server/password.test.mjs server/firebase-auth.test.mjs server/mail-template.test.mjs src/mail-status.test.mjs deploy/worker/proxy.test.mjs && node src/firebase-auth.test.mjs && node src/cloud-auth.test.mjs && node src/login-loading.test.mjs && node src/pwa.test.mjs && node src/interface-icons.test.mjs && node scripts/preview-security.test.mjs
       - run: node --check server/index.mjs && node --check server/account.mjs && node --check server/school.mjs && node --check server/system-center.mjs && node --check server/enhancements.mjs && node --check server/mail-events.mjs && node --check src/school.js && npm run check && npm run build
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.35.0 >/dev/null 2>&1; then
-            gh release create v0.35.0 --target "$GITHUB_SHA" --title "v0.35.0 作業自由填寫與共用表單修正" --notes-file deploy/RELEASE.md docs/presentations/704-class-system-role-guide.pptx
+          if ! gh release view v0.36.0 >/dev/null 2>&1; then
+            gh release create v0.36.0 --target "$GITHUB_SHA" --title "v0.36.0 班級互動、資料繳收與聊天升級" --notes-file deploy/RELEASE.md docs/presentations/704-class-system-role-guide.pptx
           fi
