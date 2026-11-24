@@ -115,6 +115,12 @@ test('Classroom PostgreSQL routes, permissions, reminders, receipts and offline 
   const extra=[randomUUID(),randomUUID()];for(const id of extra)await query("insert into accounts704(id,display_name,role) values($1,'新同學','student')",[id]);
   await call(admin,'honors','PUT',{title:'前五名',top_count:5,winners:[student.id,other.id,noMail.id,...extra]});
   const five=await call(teacher,'honors');assert.deepEqual(five.winners.map(row=>row.rank),[1,2,3,4,5]);assert.equal(five.candidates.length,5);
+  for(const outsider of [student,assistant,{...other,permissions:{publish:true,accounts:true}}])await assert.rejects(call(outsider,'honors','PATCH',{published:false}),{status:403});
+  await assert.rejects(call(teacher,'honors','PATCH',{published:true}),{status:400});
+  await call(teacher,'honors','PATCH',{published:false});
+  const hidden=await call(student,'honors');assert.equal(hidden.published,false);assert.deepEqual(hidden.winners,[]);assert.deepEqual((await call(assistant,'honors')).winners,[]);
+  const draft=await call(admin,'honors');assert.equal(draft.published,false);assert.deepEqual(draft.winners,five.winners,'Unpublishing preserves configured winners for editors');
+  await call(admin,'honors','PUT',{title:draft.title,top_count:draft.top_count,winners:draft.winners.map(row=>row.student_id)});assert.equal((await call(student,'honors')).winners.length,5,'Existing configuration can be republished');
   await call(student,'board/'+post.id,'DELETE');assert.equal((await call(admin,'board')).length,0);
  }finally{await pg.close();}
 });

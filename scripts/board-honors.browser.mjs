@@ -3,12 +3,12 @@ async(page)=>{
  const ids=Array.from({length:8},(_,index)=>'00000000-0000-4000-8000-'+String(index+1).padStart(12,'0'));
  const students=ids.slice(0,5).map((id,index)=>({id,display_name:['林同學 Eason','陳同學 Avery','張同學 Ryan','李同學 Jamie','王同學 Alex'][index],nickname:['小林','星星','阿張','小李','小王'][index]}));
  const portrait=index=>'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="${['#d8c8b5','#b9ccd2','#c8ceb7','#d7b9af','#c0bfc8'][index]}"/><circle cx="50" cy="37" r="18" fill="#fff8e9"/><path d="M16 100v-8a34 34 0 0 1 68 0v8" fill="#58606a"/></svg>`);
- let role='student',saves=[],moves=[],added=0,boardGets=0;
+ let role='student',unpublishedCount=0,saves=[],moves=[],added=0,boardGets=0;
  const actor=()=>({id:role==='student'?ids[0]:role==='teacher'?ids[5]:role==='admin'?ids[6]:ids[7],role,display_name:role==='student'?'林同學 Eason':role==='teacher'?'測試教師':role==='admin'?'測試管理員':'測試小老師',theme:'dark'});
  const noteA='10000000-0000-4000-8000-000000000001',noteB='10000000-0000-4000-8000-000000000002',noteC='10000000-0000-4000-8000-000000000003';
  let notes=[{id:noteA,author_id:ids[0],author_name:'林同學 Eason',content:'今天終於解出那一道數學題了。\n謝謝願意陪我一起練習的同學！',created_at:'2026-11-24T08:00:00Z',position_x:.07,position_y:.09,replies:[]},{id:noteB,author_id:ids[1],author_name:'陳同學 Avery',content:'這星期有一點忙，但午休和大家聊天的時間，讓我覺得很開心。',created_at:'2026-11-24T07:00:00Z',position_x:.35,position_y:.13,replies:[{id:'reply',author_name:'教師',content:'慢慢來，也要記得休息。',created_at:'2026-11-24T09:00:00Z'}]}];
  let honors={title:'第一次段考',top_count:3,published:true,ids:[ids[0],ids[1],ids[2]]};
- const honorData=()=>({...honors,winners:honors.ids.map((id,index)=>{const student=students.find(row=>row.id===id);return {rank:index+1,student_id:id,...student,avatar_url:portrait(students.indexOf(student))};}),candidates:['teacher','admin'].includes(role)?students:[]});
+ const honorData=()=>({...honors,winners:(!honors.published&&!['teacher','admin'].includes(role))?[]:honors.ids.map((id,index)=>{const student=students.find(row=>row.id===id);return {rank:index+1,student_id:id,...student,avatar_url:portrait(students.indexOf(student))};}),candidates:['teacher','admin'].includes(role)?students:[]});
  await page.addInitScript(()=>Object.defineProperty(navigator,'standalone',{value:true,configurable:true}));
  await page.route('**/preview-api/**',async route=>{
   const request=route.request(),path=new URL(request.url()).pathname.replace('/preview-api',''),method=request.method();let body={ok:true};
@@ -23,6 +23,7 @@ async(page)=>{
   }
   else if(path.startsWith('/school/board/')&&method==='PATCH'){const id=path.split('/').at(-1),data=request.postDataJSON(),note=notes.find(row=>row.id===id);check(note.author_id===actor().id,'Only own note can move');Object.assign(note,data);moves.push({id,...data});body={id,...data};}
   else if(path==='/school/honors'){
+   if(method==='PATCH'){check(['teacher','admin'].includes(role),'Unpublish editor role');check(request.postDataJSON().published===false,'Unpublish payload');unpublishedCount++;honors.published=false;}
    if(method==='PUT'){check(['teacher','admin'].includes(role),'Honors editor role');const data=request.postDataJSON();saves.push(data);honors={title:data.title,top_count:data.top_count,published:true,ids:data.winners};}
    body=honorData();
   }
@@ -58,5 +59,10 @@ async(page)=>{
  await page.setViewportSize({width:390,height:844});await page.locator('.podium-scroll').evaluate(element=>element.scrollLeft=(element.scrollWidth-element.clientWidth)/2);await screenshot('.taste-skill/honors-five-mobile.png');
  role='admin';await open();await view('board');await page.locator(`[data-note-id="${noteA}"]`).waitFor();check(await page.locator('[data-note-move]').count()===0,'Admin cannot move another author notes');await page.locator(`[data-open-note="${noteB}"]`).click();await page.locator('#board-reply-form').waitFor();await page.locator('#board-dialog [data-close]').click();
  role='assistant';await open();await view('honors');await page.locator('.honors-podium').waitFor();check(await page.locator('#edit-honors').count()===0,'Assistant cannot edit honors');
+ role='teacher';await open();await view('honors');await page.locator('#unpublish-honors').click();await page.getByText('英雄榜尚未公布',{exact:true}).waitFor();check(unpublishedCount===1,'Teacher can unpublish');
+ await page.locator('#edit-honors').click();check(await page.locator('#honors-form [name="place-1"]').inputValue()===ids[0],'Unpublish preserves configured places');await page.locator('#honors-editor [data-close]').click();
+ role='student';await open();await view('honors');await page.getByText('英雄榜尚未公布',{exact:true}).waitFor();check(await page.locator('.honors-podium,#unpublish-honors').count()===0,'Student sees unpublished message and no podium/action');
+ role='admin';await open();await view('honors');await page.locator('#edit-honors').click();await page.locator('#honors-form [type="submit"]').click();await page.locator('.honors-podium').waitFor();
+ role='student';await open();await view('honors');await page.locator('.honors-podium').waitFor();honors.published=false;await page.getByText('英雄榜尚未公布',{exact:true}).waitFor({timeout:22000});check(await page.locator('.honors-podium').count()===0,'Open student page removes unpublished ranking automatically');
  return 'Board and honors passed: full-screen cork wall, own-note keyboard/drag persistence, public replies, no foreign-note movement, 1/3/5 podium configuration, names/nicknames/avatars, 13 themes and 320–1440px';
 }
