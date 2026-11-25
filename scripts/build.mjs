@@ -73,6 +73,7 @@ html = html
 await writeFile("dist/index.html", html);
 await cp("service-worker.js", "dist/service-worker.js");
 await cp("src", "dist/src", { recursive: true });
+for(const page of ['about','privacy','terms'])await cp(page,`dist/${page}`,{recursive:true});
 await cp("docs/presentations/704-class-system-role-guide.pptx", "dist/downloads/704-class-system-role-guide.pptx");
 
 const portals = {

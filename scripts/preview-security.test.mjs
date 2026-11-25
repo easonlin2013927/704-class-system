@@ -8,5 +8,6 @@ assert.equal(previewApiPath('/preview-api/health','//evil.example'),null);
 const root=resolve('dist');
 assert.equal(previewFilePath(root,'/src/main.js'),resolve(root,'src/main.js'));
 assert.equal(previewFilePath(root,'/'),resolve(root,'index.html'));
+for(const page of ['about','privacy','terms'])assert.equal(previewFilePath(root,`/${page}/index.html`),resolve(root,page,'index.html'));
 for(const path of ['/src/../../.env','/src/..\\..\\.env','/src/a.js:secret','/src/\0secret','/.env','/server/firebase-config.mjs'])assert.equal(previewFilePath(root,path),null,path);
 console.log('Preview proxy route and file containment checks passed');

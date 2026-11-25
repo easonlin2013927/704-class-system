@@ -9,7 +9,7 @@ export function previewApiPath(pathname,search=''){
 }
 export function previewFilePath(root,pathname){
  if(/[\\:\u0000-\u001f]/.test(pathname)||pathname.split('/').some(part=>part.startsWith('.')))return null;
- if(pathname!=='/'&&!/^\/(?:src\/|student\/|teacher\/|admin\/|assets\/|downloads\/|index\.html$)/.test(pathname))return null;
+ if(pathname!=='/'&&!/^\/(?:src\/|student\/|teacher\/|admin\/|about\/|privacy\/|terms\/|assets\/|downloads\/|index\.html$)/.test(pathname))return null;
  const file=resolve(root,'.'+(pathname==='/'?'/index.html':pathname));
  const child=relative(resolve(root),file);
  return child==='..'||child.startsWith('../')||child.startsWith('..\\')||isAbsolute(child)?null:file;

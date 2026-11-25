@@ -14,6 +14,12 @@
 
 網址不隨版本變更。學生與教師請安裝對應 PWA；iPhone／iPad 使用 Safari「分享 → 加入主畫面」。管理員可直接使用一般瀏覽器。入口不會改變帳號權限。
 
+## 公開介紹與政策
+
+[系統介紹／應用程式首頁](https://easonlin2013927.github.io/704-class-system/about/) · [隱私權政策](https://easonlin2013927.github.io/704-class-system/privacy/) · [服務條款](https://easonlin2013927.github.io/704-class-system/terms/)
+
+三頁可直接閱讀，不需登入或安裝 PWA。可分別填入 Google Auth Platform「品牌」的首頁、隱私權政策與服務條款欄位；網域所有權與品牌驗證仍需由 Google 審核。
+
 ## 主要功能
 
 - **今天**：依臺北日期顯示今日公告、活動、作業期限、個人提醒或班級紀錄，以及收件閘未讀數量。資料及操作入口依帳號權限顯示。
