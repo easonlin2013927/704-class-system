@@ -3,13 +3,13 @@ import {mountAccountProviders} from './account-providers.js';
 import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
 import { mountProviderLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.38.0";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.38.0';
-import {mountMailboxes} from './mailboxes.js?v=0.38.0';
-import {mountMailTest} from './mail-test.js?v=0.38.0';
-import { portals, portalRole } from "./portal.js?v=0.38.0";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.38.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.38.0';
+import { initConnectivityGuard } from "./connectivity.js?v=0.38.1";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.38.1';
+import {mountMailboxes} from './mailboxes.js?v=0.38.1';
+import {mountMailTest} from './mail-test.js?v=0.38.1';
+import { portals, portalRole } from "./portal.js?v=0.38.1";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.38.1";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.38.1';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 import {isAppWindow,pwaDisplayModes} from './pwa.js';
 
@@ -43,7 +43,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;if(activeRole!=='admin')render();});
 window.addEventListener('appinstalled',()=>{installPrompt=null;syncPwaContext();if(!isPwaWindow())render();});
-function renderInstallGuide(){const role=activeRole==='teacher'?'教師端':'學生端',appName=`704${activeRole==='teacher'?'教師':'學生'}`;document.title=`${role}安裝｜704班級系統`;app.innerHTML=`<main class="install-gate"><section class="install-card"><div class="install-brand"><img src="./src/logo.svg" width="96" height="96" alt=""><div><span>704 CLASS SYSTEM</span><strong>704班級系統</strong></div></div><p class="install-kicker">${role}專用應用程式</p><h1>從應用程式進入班級系統</h1><p>已安裝時，請從主畫面或應用程式清單開啟「${appName}」。尚未安裝時，使用下方按鈕或瀏覽器的安裝功能。</p><div class="install-actions">${installPrompt?'<button class="primary-button" id="install-pwa">安裝 '+appName+'</button>':''}<a class="secondary-button" href="https://github.com/easonlin2013927/704-class-system/wiki" target="_blank" rel="noopener">查看安裝說明</a></div><p class="install-ios">iPhone／iPad：在 Safari 按「分享」→「加入主畫面」。</p></section></main>`;document.querySelector('#install-pwa')?.addEventListener('click',async()=>{if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;render();}});}
+function renderInstallGuide(){const role=activeRole==='teacher'?'教師端':'學生端',appName=`704${activeRole==='teacher'?'教師':'學生'}`;document.title=`${role}安裝｜704班級系統`;app.innerHTML=`<main class="install-gate"><section class="install-card"><div class="install-brand"><img src="./src/logo.svg" width="96" height="96" alt=""><div><span>704 CLASS SYSTEM</span><strong>704班級系統</strong></div></div><p class="install-kicker">${role}專用應用程式</p><h1>從應用程式進入班級系統</h1><p>已安裝時，請從主畫面或應用程式清單開啟「${appName}」。尚未安裝時，使用下方按鈕或瀏覽器的安裝功能。</p><div class="install-actions">${installPrompt?'<button class="primary-button" id="install-pwa">安裝 '+appName+'</button>':''}<a class="secondary-button" href="https://github.com/easonlin2013927/704-class-system/wiki" target="_blank" rel="noopener">查看安裝說明</a></div><section class="install-windows" aria-labelledby="windows-install-title"><h2 id="windows-install-title">Windows 電腦手動安裝</h2><p>使用 Chrome 或 Microsoft Edge 開啟本頁，依照下列步驟安裝。</p><h3>Google Chrome</h3><ol><li>點右上角「⋮」，選擇「投放、儲存及分享」。</li><li>選擇「將頁面安裝為應用程式」，在視窗中按「安裝」。</li></ol><h3>Microsoft Edge</h3><ol><li>點右上角「⋯」，選擇「更多工具」中的「應用程式」（部分版本直接顯示「應用程式」）。</li><li>選擇「將此網站安裝為應用程式」，在視窗中按「安裝」。</li></ol><p>也可點網址列右側的安裝圖示。完成後，從 Windows「開始」功能表開啟「${appName}」，也可將應用程式釘選到工作列。</p></section><p class="install-ios">iPhone／iPad：在 Safari 按「分享」→「加入主畫面」。</p></section></main>`;document.querySelector('#install-pwa')?.addEventListener('click',async()=>{if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;render();}});}
 window.addEventListener("hashchange", () => {
   cancelSessionRestore();
   cloud.logout();

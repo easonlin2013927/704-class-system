@@ -1,5 +1,14 @@
 # 教師使用手冊
 
+## Windows 電腦安裝
+
+用 Chrome 或 Microsoft Edge 開啟[教師安裝入口](https://easonlin2013927.github.io/704-class-system/teacher/)。
+
+- Chrome：右上角「⋮」選「投放、儲存及分享」，再選「將頁面安裝為應用程式」，確認安裝。
+- Edge：右上角「⋯」選「更多工具」中的「應用程式」（部分版本直接顯示「應用程式」），再選「將此網站安裝為應用程式」，確認安裝。
+
+也可使用網址列右側的安裝圖示。完成後從 Windows「開始」功能表開啟「704教師」，或將應用程式釘選到工作列。詳見 [Chrome 官方說明](https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DDesktop&hl=zh-hant)與 [Edge 官方說明](https://support.microsoft.com/zh-tw/edge/install-manage-or-uninstall-apps-in-microsoft-edge)。
+
 ## 今天與批量動作（v0.28.0）
 
 「今天」集中顯示今日公告、近期作業期限、進行中的活動及需要處理的班級紀錄。建立作業、缺交紀錄、評語與加扣分時，可按「全班」一次選取全部學生。教師亦可在作業、成績與學生紀錄頁勾選多筆後一次變更期限、公開狀態、補交狀態或刪除。

@@ -1,5 +1,14 @@
 # 學生使用手冊
 
+## Windows 電腦安裝
+
+用 Chrome 或 Microsoft Edge 開啟[學生安裝入口](https://easonlin2013927.github.io/704-class-system/student/)。
+
+- Chrome：右上角「⋮」選「投放、儲存及分享」，再選「將頁面安裝為應用程式」，確認安裝。
+- Edge：右上角「⋯」選「更多工具」中的「應用程式」（部分版本直接顯示「應用程式」），再選「將此網站安裝為應用程式」，確認安裝。
+
+也可使用網址列右側的安裝圖示。完成後從 Windows「開始」功能表開啟「704學生」，或將應用程式釘選到工作列。詳見 [Chrome 官方說明](https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DDesktop&hl=zh-hant)與 [Edge 官方說明](https://support.microsoft.com/zh-tw/edge/install-manage-or-uninstall-apps-in-microsoft-edge)。
+
 ## 今天（v0.28.0）
 
 登入後可從導覽列開啟「今天」，一次查看今日新公告、未來三天截止的作業、進行中活動、自己的缺交或提醒。
