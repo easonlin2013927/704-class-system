@@ -1,14 +1,15 @@
+import {mountClassroomPermissions} from './classroom-permissions.js';
 import {mountAccountProviders} from './account-providers.js';
 import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
 import { mountProviderLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.37.1";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.37.1';
-import {mountMailboxes} from './mailboxes.js?v=0.37.1';
-import {mountMailTest} from './mail-test.js?v=0.37.1';
-import { portals, portalRole } from "./portal.js?v=0.37.1";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.37.1";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.37.1';
+import { initConnectivityGuard } from "./connectivity.js?v=0.38.0";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.38.0';
+import {mountMailboxes} from './mailboxes.js?v=0.38.0';
+import {mountMailTest} from './mail-test.js?v=0.38.0';
+import { portals, portalRole } from "./portal.js?v=0.38.0";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.38.0";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.38.0';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 import {isAppWindow,pwaDisplayModes} from './pwa.js';
 
@@ -372,6 +373,7 @@ function renderAccounts() {
  <footer class="editor-footer"><span>編輯後，該帳號需重新登入。</span><button class="primary-button" id="save-person">建立帳號</button></footer>
  </form>${isAdmin?'<section id="permission-editor" class="editor-card" hidden><h2>功能權限</h2><p>可依帳號細分公告、作業、成績、紀錄、檢舉、帳號、全員通知與聊天管理權限。</p><div id="permission-fields" class="permission-grid"></div><p id="permission-message" role="status"></p></section><section id="admin-mailboxes" class="editor-card" hidden></section>':''}</dialog>
  <section class="editor-card"><h2>現有帳號</h2><label>篩選帳號<select id="account-filter"><option value="all">全部</option><option value="student">學生</option><option value="teacher">教師</option><option value="assistant">小老師</option><option value="admin">管理員</option><option value="disabled">已停用</option><option value="active">啟用中</option></select></label><div class="bulk-selection account-bulk"><div class="selection-tools"><button type="button" class="secondary-button" data-account-pick="visible">全選目前結果</button><button type="button" class="secondary-button" data-account-pick="students">全班學生</button><button type="button" class="secondary-button" data-account-pick="none">清除</button><strong id="account-picked-count">已選 0 人</strong></div><div class="school-inline"><label>批量動作<select id="account-bulk-action"><option value="enable">啟用帳號</option><option value="disable">停用帳號</option><option value="require_password">要求更換密碼</option><option value="clear_password">取消更換密碼要求</option>${isAdmin?'<option value="require_email">要求新增 Email</option><option value="clear_email">取消新增 Email 要求</option>':''}</select></label><button type="button" class="primary-button" id="apply-account-bulk">套用至已選帳號</button></div></div><p id="accounts-message" role="status">載入中…</p><div id="accounts-list"></div></section></main>`;
+ if(state.session.role==='teacher'){document.querySelector('#create-person').insertAdjacentHTML('afterend','<section id="classroom-permissions" class="editor-card"></section>');mountClassroomPermissions(document.querySelector('#classroom-permissions'),toast);}
  bindHeader();
  document.querySelector("#accounts-back").addEventListener("click",goHome);
  const dialog=document.querySelector("#person-dialog"),form=document.querySelector("#account-form"),message=document.querySelector("#accounts-message"),list=document.querySelector("#accounts-list");
@@ -379,7 +381,7 @@ function renderAccounts() {
  form.reset();form.elements.id.value=account?.id||"";
  form.elements.email.value=account?.email||"";form.elements.name.value=account?.display_name||"";form.elements.role.value=account?.role||"student";
  form.elements.disabled.checked=Boolean(account?.disabled);form.elements.must_change_password.checked=Boolean(account?.must_change_password);
- if(isAdmin){form.elements.must_add_email.checked=Boolean(account?.must_add_email);form.elements.require_change_email.checked=Boolean(account?.must_change_email);const box=document.querySelector('#admin-mailboxes'),permissionEditor=document.querySelector('#permission-editor');box.hidden=!account;permissionEditor.hidden=!account;document.querySelector('#required-email-label').hidden=!form.elements.require_change_email.checked;form.elements.must_change_email.innerHTML=account?'<option value="">請選擇</option>':'<option value="default">新建帳號的預設信箱</option>';if(account){mountMailboxes(box,account.id);cloud.school('mail-admin/'+account.id).then(rows=>{if(!dialog.open||form.elements.id.value!==account.id)return;form.elements.must_change_email.innerHTML='<option value="">請選擇</option>'+rows.map(x=>`<option value="${escapeHtml(x.id)}">${escapeHtml(x.address)}</option>`).join('');form.elements.must_change_email.value=account.must_change_email||'';}).catch(e=>toast(e.message,'error'));cloud.school('permissions/'+account.id).then(value=>{if(!dialog.open||form.elements.id.value!==account.id)return;const labels={publish:'發布公告',homework:'管理作業',grades:'管理成績',records:'學生紀錄',reports:'處理檢舉',accounts:'帳號管理',broadcast:'全員通知',chat_moderation:'聊天管理',board_reply:'留言板回覆',collections:'資料繳收管理'};document.querySelector('#permission-fields').innerHTML=Object.entries(value.permissions).map(([key,enabled])=>`<label class="check-option"><input type="checkbox" data-permission="${key}" ${enabled?'checked':''}>${labels[key]||key}</label>`).join('');document.querySelector('#permission-message').textContent='';}).catch(e=>document.querySelector('#permission-message').textContent=e.message);}}
+ if(isAdmin){form.elements.must_add_email.checked=Boolean(account?.must_add_email);form.elements.require_change_email.checked=Boolean(account?.must_change_email);const box=document.querySelector('#admin-mailboxes'),permissionEditor=document.querySelector('#permission-editor');box.hidden=!account;permissionEditor.hidden=!account;document.querySelector('#required-email-label').hidden=!form.elements.require_change_email.checked;form.elements.must_change_email.innerHTML=account?'<option value="">請選擇</option>':'<option value="default">新建帳號的預設信箱</option>';if(account){mountMailboxes(box,account.id);cloud.school('mail-admin/'+account.id).then(rows=>{if(!dialog.open||form.elements.id.value!==account.id)return;form.elements.must_change_email.innerHTML='<option value="">請選擇</option>'+rows.map(x=>`<option value="${escapeHtml(x.id)}">${escapeHtml(x.address)}</option>`).join('');form.elements.must_change_email.value=account.must_change_email||'';}).catch(e=>toast(e.message,'error'));cloud.school('permissions/'+account.id).then(value=>{if(!dialog.open||form.elements.id.value!==account.id)return;const labels={publish:'發布公告',homework:'管理作業',grades:'管理成績',records:'學生紀錄',reports:'處理檢舉',accounts:'帳號管理',broadcast:'全員通知',chat_moderation:'聊天管理',honors:'段考英雄榜編輯與公布',board_manage:'班級留言板管理',board_reply:'班級留言板回覆',collections:'資料繳收管理'};document.querySelector('#permission-fields').innerHTML=Object.entries(value.permissions).map(([key,enabled])=>`<label class="check-option"><input type="checkbox" data-permission="${key}" ${enabled?'checked':''}>${labels[key]||key}</label>`).join('');document.querySelector('#permission-message').textContent='';}).catch(e=>document.querySelector('#permission-message').textContent=e.message);}}
  form.elements.password.disabled=Boolean(account);
  document.querySelector("#reset-password-option").hidden=!account;
  document.querySelector("#person-form-title").textContent=account?"編輯帳號":"新增帳號";

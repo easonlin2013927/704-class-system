@@ -13,7 +13,7 @@ async(page)=>{
  await page.route('**/preview-api/**',async route=>{
   const request=route.request(),path=new URL(request.url()).pathname.replace('/preview-api',''),method=request.method();let body={ok:true};
   if(path==='/me')body=actor();
-  else if(path==='/school/permissions')body={permissions:{board_reply:role!=='student',collections:role==='teacher'||role==='admin',accounts:role==='admin'}};
+  else if(path==='/school/permissions')body={permissions:{honors:role==='teacher'||role==='admin',board_manage:role==='teacher'||role==='admin',board_reply:role!=='student',collections:role==='teacher'||role==='admin',accounts:role==='admin'}};
   else if(path==='/school/preferences')body={favorites:['board','honors']};
   else if(path==='/school/mailboxes')body=[{id:'mail',address:'fixture@example.test',verified:true}];
   else if(path==='/public/banner')body={enabled:false,content:'',marqueeEnabled:false,marquee:''};

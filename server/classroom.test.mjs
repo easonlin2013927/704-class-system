@@ -10,7 +10,7 @@ test('Classroom PostgreSQL routes, permissions, reminders, receipts and offline 
  const pg=new PGlite();
  const query=async(sql,values=[])=>{if(sql.includes('create table')){await pg.exec(sql);return {rows:[],rowCount:0};}const r=await pg.query(sql,values);return {...r,rowCount:/^\s*select/i.test(sql)?r.rows.length:r.affectedRows};};
  const db={query,connect:async()=>({query,release(){}})},tools=createClassroom(db);
- const admin={id:randomUUID(),role:'admin',display_name:'管理員'},teacher={id:randomUUID(),role:'teacher',display_name:'教師',permissions:{board_reply:true,collections:true}},assistant={id:randomUUID(),role:'assistant',display_name:'小老師',permissions:{board_reply:true}},student={id:randomUUID(),role:'student',display_name:'學生甲'},other={id:randomUUID(),role:'student',display_name:'學生乙'},noMail={id:randomUUID(),role:'student',display_name:'學生丙'};
+ const admin={id:randomUUID(),role:'admin',display_name:'管理員'},teacher={id:randomUUID(),role:'teacher',display_name:'教師',permissions:{board_reply:true,board_manage:true,honors:true,collections:true}},assistant={id:randomUUID(),role:'assistant',display_name:'小老師',permissions:{board_reply:true}},student={id:randomUUID(),role:'student',display_name:'學生甲'},other={id:randomUUID(),role:'student',display_name:'學生乙'},noMail={id:randomUUID(),role:'student',display_name:'學生丙'};
  try{
   await pg.exec(`create table accounts704(id uuid primary key,display_name text,role text,nickname text default '',avatar_url text default '',disabled boolean default false);
    create table school_presence(account_id uuid primary key references accounts704(id),last_seen timestamptz default now());
@@ -119,6 +119,17 @@ test('Classroom PostgreSQL routes, permissions, reminders, receipts and offline 
   await assert.rejects(call(teacher,'honors','PATCH',{published:true}),{status:400});
   await call(teacher,'honors','PATCH',{published:false});
   const hidden=await call(student,'honors');assert.equal(hidden.published,false);assert.deepEqual(hidden.winners,[]);assert.deepEqual((await call(assistant,'honors')).winners,[]);
+  const delegated={...other,permissions:{honors:true}};
+  assert.equal((await call(delegated,'honors')).candidates.length,5);
+  await call(delegated,'honors','PUT',ranking);
+  await call(delegated,'honors','PATCH',{published:false});
+  await assert.rejects(call({...teacher,permissions:{honors:false}},'honors','PUT',ranking),{status:403});
+  await assert.rejects(call({...teacher,permissions:{board_manage:false}},'board/'+post.id,'DELETE'),{status:403});
+  const removable=await call(student,'board','POST',{content:'授權管理刪除'});
+  await call({...other,permissions:{board_manage:true}},'board/'+removable.id,'DELETE');
+  await assert.rejects(call({...teacher,permissions:{board_reply:false}},'board/'+post.id+'/replies','POST',{content:'已撤銷'}),{status:403});
+  await call(admin,'honors','PUT',{title:five.title,top_count:5,winners:five.winners.map(row=>row.student_id)});
+  await call(admin,'honors','PATCH',{published:false});
   const draft=await call(admin,'honors');assert.equal(draft.published,false);assert.deepEqual(draft.winners,five.winners,'Unpublishing preserves configured winners for editors');
   await call(admin,'honors','PUT',{title:draft.title,top_count:draft.top_count,winners:draft.winners.map(row=>row.student_id)});assert.equal((await call(student,'honors')).winners.length,5,'Existing configuration can be republished');
   await call(student,'board/'+post.id,'DELETE');assert.equal((await call(admin,'board')).length,0);

@@ -18,7 +18,8 @@ const defaults={
  assistant:{publish:true,homework:true,grades:false,records:false,reports:false,points:false,subjects:false,accounts:false,broadcast:false,chat_moderation:false,site_settings:false},
  student:{publish:false,homework:false,grades:false,records:false,reports:false,points:false,subjects:false,accounts:false,broadcast:false,chat_moderation:false,site_settings:false}
 };
-for(const [role,permissions] of Object.entries(defaults)){permissions.board_reply=role!=='student';permissions.collections=['teacher','admin'].includes(role);}
+for(const [role,permissions] of Object.entries(defaults)){permissions.board_reply=role!=='student';permissions.collections=['teacher','admin'].includes(role);permissions.board_manage=['teacher','admin'].includes(role);permissions.honors=['teacher','admin'].includes(role);}
+export const classroomPermissionKeys=['honors','board_manage','board_reply'];
 export const permissionKeys=Object.keys(defaults.admin);
 
 export async function migrateEnhancements(){await db.query(`
@@ -120,9 +121,18 @@ const storagePath=key=>{if(!uuid(key))fail(500,'附件儲存資訊錯誤');retur
 export async function enhancementRoutes({path,query,method,user,tokenHash,readBody,send,req,res}){
  let match;
  if(path==='/school/permissions'&&method==='GET'){send(200,{permissions:await permissionsFor(user),keys:permissionKeys});return true;}
+ if(path==='/school/permission-accounts'&&method==='GET'){
+  if(!['teacher','admin'].includes(user.role))fail(403,'只有教師與管理員可以調整班級工具權限');
+  send(200,(await db.query("select id,role,display_name from accounts704 where role in ('student','assistant') order by role,display_name")).rows);return true;
+ }
  if((match=path.match(/^\/school\/permissions\/([0-9a-f-]{36})$/i))){
-  if(user.role!=='admin')fail(403,'僅限管理員調整權限');
+  if(!['teacher','admin'].includes(user.role))fail(403,'只有教師與管理員可以調整權限');
   const account=(await db.query('select id,role,display_name from accounts704 where id=$1',[match[1]])).rows[0];if(!account)fail(404,'找不到帳號');
+  if(user.role==='teacher'){
+   if(!['student','assistant'].includes(account.role))fail(403,'教師只能調整學生與小老師的班級工具權限');
+   if(method==='GET'){const current=await permissionsFor(account);send(200,{account,permissions:Object.fromEntries(classroomPermissionKeys.map(key=>[key,current[key]]))});return true;}
+   if(method==='PUT'){const body=await readBody();if(!body||Object.keys(body).length!==classroomPermissionKeys.length||classroomPermissionKeys.some(key=>typeof body[key]!=='boolean'))fail(400,'只能設定英雄榜、留言板管理與回覆權限');const clean=Object.fromEntries(classroomPermissionKeys.map(key=>[key,body[key]]));await db.query('insert into account_permissions704(account_id,permissions) values($1,$2) on conflict(account_id) do update set permissions=account_permissions704.permissions || $2::jsonb,updated_at=now()',[account.id,clean]);send(200,{permissions:clean});return true;}
+  }
   if(method==='GET'){const custom=(await db.query('select permissions from account_permissions704 where account_id=$1',[account.id])).rows[0]?.permissions||{};send(200,{account,defaults:defaults[account.role],permissions:{...defaults[account.role],...custom}});return true;}
   if(method==='PUT'){const body=await readBody(),clean={};for(const key of permissionKeys){if(typeof body[key]!=='boolean')fail(400,'權限設定格式錯誤');clean[key]=body[key];}await db.query('insert into account_permissions704(account_id,permissions) values($1,$2) on conflict(account_id) do update set permissions=$2,updated_at=now()',[account.id,clean]);send(200,{permissions:clean});return true;}
  }
