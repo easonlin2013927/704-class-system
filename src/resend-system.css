@@ -236,9 +236,6 @@
 .install-windows ol{margin:0;padding-left:1.4em;color:#d4d4d8;line-height:1.9}
 .install-windows li+li{margin-top:6px}
 .install-windows p{color:#a1a1aa;font-size:14px;line-height:1.8}
-.public-links{display:flex;flex-wrap:wrap;gap:10px 20px;margin-top:24px;color:#a1a1aa;font-size:13px}
-.public-links a{color:inherit;text-underline-offset:4px}
-.public-links a:hover{color:#fff}
 .install-brand{border-color:rgba(255,255,255,.1)!important}.install-brand span{color:#71717a!important}.install-brand strong,.install-card h1{color:#fcfdff!important}.install-card>p:not(.install-kicker):not(.install-ios){color:#a1a1aa!important}.install-kicker{color:#d4d4d8!important;border-color:rgba(255,255,255,.18)!important;border-radius:6px}.install-ios{color:#d4d4d8!important;background:#101012!important;border-left:2px solid #fff!important}
 [data-theme="dark"] .theme-card{padding:9px;background:#070708;border-color:var(--line)!important;border-radius:9px!important}
 [data-theme="dark"] .theme-card:hover{border-color:var(--line-strong)!important;transform:translateY(-2px)}
