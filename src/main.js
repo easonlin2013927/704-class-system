@@ -3,15 +3,16 @@ import {mountAccountProviders} from './account-providers.js';
 import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
 import { mountProviderLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.38.5";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.38.5';
-import {mountMailboxes} from './mailboxes.js?v=0.38.5';
-import {mountMailTest} from './mail-test.js?v=0.38.5';
-import { portals, portalRole } from "./portal.js?v=0.38.5";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.38.5";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.38.5';
+import { initConnectivityGuard } from "./connectivity.js?v=0.39.0";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.39.0';
+import {mountMailboxes} from './mailboxes.js?v=0.39.0';
+import {mountMailTest} from './mail-test.js?v=0.39.0';
+import { portals, portalRole } from "./portal.js?v=0.39.0";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.39.0";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.39.0';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 import {isAppWindow,pwaDisplayModes} from './pwa.js';
+import {notify} from './feedback.js';
 
 initConnectivityGuard();
 
@@ -134,7 +135,12 @@ async function restoreSession(){
 let pendingOperations=0;
 window.addEventListener('operation-start',()=>{pendingOperations++;let el=document.querySelector('#operation-progress');if(!el){el=document.createElement('div');el.id='operation-progress';el.setAttribute('role','status');el.textContent='處理中，請稍候…';document.body.append(el);}el.hidden=false;});
 window.addEventListener('operation-end',()=>{pendingOperations=Math.max(0,pendingOperations-1);const el=document.querySelector('#operation-progress');if(el&&!pendingOperations)el.hidden=true;});
-window.addEventListener('operation-result',event=>toast(event.detail.ok?'操作成功':event.detail.message||'操作失敗',event.detail.ok?'success':'error'));
+let operationNoticeTimer;
+window.addEventListener('operation-result',event=>{
+ if(['/login','/auth/firebase','/logout'].includes(event.detail.path))return;
+ if(event.detail.ok){clearTimeout(operationNoticeTimer);operationNoticeTimer=setTimeout(()=>toast('操作完成'),400);}
+ else toast(event.detail.message||'操作失敗','error');
+});
 document.addEventListener("click",event=>{const menu=document.querySelector(".create-menu");if(menu&&!menu.contains(event.target)){document.querySelector("#create-options").hidden=true;document.querySelector("#create-toggle").setAttribute("aria-expanded","false");}});
 
 function escapeHtml(value = "") {
@@ -177,16 +183,9 @@ function icon(name, size = 20) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
 }
 
-function toast(message, tone = "success") {
-  const el = document.createElement("div");
-  el.className = `toast ${tone}`;
-  el.textContent = message;
-  document.querySelector("#toast-region").append(el);
-  requestAnimationFrame(() => el.classList.add("show"));
-  setTimeout(() => {
-    el.classList.remove("show");
-    setTimeout(() => el.remove(), 250);
-  }, 2600);
+function toast(message, tone = "success", options = {}) {
+  clearTimeout(operationNoticeTimer);
+  notify(message,tone,options);
 }
 
 let presenceLast=0,presenceUser=null,lastInteraction=Date.now();
@@ -289,7 +288,9 @@ function renderLogin() {
     </main>`;
 
   const authConfig=cloud.authConfig();
-  for(const provider of ['google','github','microsoft'])mountProviderLogin(document.querySelector('#'+provider+'-login'), activeRole, finishLogin, error=>{state.session=null;cloud.logout();toast(error.message,'error');},provider,authConfig).catch(error=>toast(error.message,'error'));
+  const loginComplete=async profile=>{await finishLogin(profile);if(state.session?.id===profile.id)toast('登入成功','success',{presentation:'banner'});};
+  const loginFailed=error=>{state.session=null;cloud.logout();toast(error.message,'error',{presentation:'banner',title:'登入失敗'});};
+  for(const provider of ['google','github','microsoft'])mountProviderLogin(document.querySelector('#'+provider+'-login'), activeRole, loginComplete, loginFailed,provider,authConfig).catch(error=>toast(error.message,'error',{presentation:'banner',title:'登入服務暫時無法使用'}));
   document.querySelector("#login-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -297,8 +298,8 @@ function renderLogin() {
     button.disabled = true;
     try {
       const profile = await cloud.login(data.get("account"), data.get("password"), activeRole, data.has("remember"));
-      await finishLogin(profile);
-    } catch (error) { state.session=null; cloud.logout(); toast(error.message, "error"); }
+      await loginComplete(profile);
+    } catch (error) { loginFailed(error); }
     finally { button.disabled = false; }
   });
 }
@@ -350,7 +351,7 @@ function renderHealthCenter(){
  bindHeader();document.querySelector('#health-back').onclick=goHome;const message=document.querySelector('#health-message'),summary=document.querySelector('#health-summary'),rows=document.querySelector('#health-rows'),backups=document.querySelector('#backup-rows');
  const load=async()=>{try{const [h,list]=await Promise.all([cloud.school('health-center'),cloud.school('backups')]);summary.innerHTML=`<article class="summary-tile"><small>API</small><strong>正常</strong><span>已運作 ${Math.floor(h.api.uptime_seconds/3600)} 小時</span></article><article class="summary-tile"><small>資料庫</small><strong>${h.database.latency_ms} ms</strong><span>${formatBytes(h.database.size_bytes)}</span></article><article class="summary-tile"><small>資料碟可用空間</small><strong>${formatBytes(h.storage.free_bytes)}</strong><span>${escapeHtml(h.storage.path)}</span></article><article class="summary-tile"><small>外部通知</small><strong>${h.services.external_notifications?'開啟':'關閉'}</strong><span>Email ${h.services.email_configured?'已設定':'未設定'}</span></article>`;const info=[['檢查時間',formatDate(h.checked_at,true)],['執行主機',h.api.host],['平台',h.api.platform],['CPU',h.api.cpu],['記憶體',`${formatBytes(h.api.memory_used)} / ${formatBytes(h.api.memory_total)}`],['資料庫連線',`${h.database.connections.active} 使用中 / ${h.database.connections.total} 總計`],['帳號',h.counts.accounts],['公告',h.counts.announcements],['作業',h.counts.homework],['聊天訊息',h.counts.messages]];rows.innerHTML=info.map(([k,v])=>`<tr><th>${escapeHtml(String(k))}</th><td>${escapeHtml(String(v))}</td></tr>`).join('');backups.innerHTML=list.map(x=>`<tr><td>${formatDate(x.created_at,true)}</td><td><span class="status-badge ${x.status==='failed'?'disabled':''}">${x.status==='ready'?'可下載':x.status==='creating'?'建立中':'失敗'}</span></td><td>${x.table_count} 個資料表、${x.row_count} 筆資料${x.error?`<small>${escapeHtml(x.error)}</small>`:''}</td><td>${formatBytes(x.size_bytes)}</td><td>${x.status==='ready'?`<button class="secondary-button" data-backup-download="${x.id}">下載</button>`:''}<button class="danger-button" data-backup-delete="${x.id}">刪除</button></td></tr>`).join('')||'<tr><td colspan="5">尚未建立備份。</td></tr>';message.textContent='';bindBackupActions();}catch(error){message.textContent=error.message;}};
  const bindBackupActions=()=>{backups.querySelectorAll('[data-backup-download]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await cloud.downloadBackup(b.dataset.backupDownload);toast('備份下載完成');}catch(error){toast(error.message,'error');}finally{b.disabled=false;}});backups.querySelectorAll('[data-backup-delete]').forEach(b=>b.onclick=async()=>{if(!confirm('確定刪除此備份？刪除後無法復原。'))return;b.disabled=true;try{await cloud.school(`backups/${b.dataset.backupDelete}`,'DELETE');await load();}catch(error){toast(error.message,'error');b.disabled=false;}});};
- document.querySelector('#refresh-health').onclick=load;document.querySelector('#create-backup').onclick=async event=>{event.currentTarget.disabled=true;message.textContent='正在建立並壓縮備份…';try{await cloud.school('backups','POST',{});toast('備份建立完成');await load();}catch(error){message.textContent=error.message;}finally{event.currentTarget.disabled=false;}};load();
+ document.querySelector('#refresh-health').onclick=load;document.querySelector('#create-backup').onclick=async event=>{event.currentTarget.disabled=true;message.textContent='正在建立並壓縮備份…';try{await cloud.school('backups','POST',{});toast('備份建立完成','success',{presentation:'dialog',title:'備份已建立'});await load();}catch(error){message.textContent=error.message;}finally{event.currentTarget.disabled=false;}};load();
 }
 
 function renderAccounts() {
@@ -421,7 +422,7 @@ function renderAccounts() {
  const button=event.target.closest("[data-remove-account]");if(!button)return;
  const account=state.accounts.find(item=>item.id===button.dataset.removeAccount);
  if(!window.confirm(`確定刪除帳號「${account.display_name}」？`))return;
- try{await cloud.deleteAccount(account.id);toast("帳號已刪除");await refresh();}catch(error){toast(error.message,"error");}
+ try{await cloud.deleteAccount(account.id);toast("帳號已刪除","success",{presentation:"dialog"});await refresh();}catch(error){toast(error.message,"error");}
  });refresh();
 }
 

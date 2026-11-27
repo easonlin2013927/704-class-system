@@ -1,0 +1,233 @@
+/* Original 704 component styles; visual research and sources: docs/ui-sources.md.
+   Loaded after the existing themes. Keep native controls and application markup. */
+[data-theme] {
+  --ui-edge:var(--line-strong,var(--line));
+  --ui-shadow:0 2px 3px #00000014,inset 0 1px 0 color-mix(in srgb,var(--ink) 5%,transparent);
+  --ui-ring:color-mix(in srgb,var(--accent) 16%,transparent);
+  --ui-radius:8px;
+}
+
+/* Restrict motion to component shells; never transform editor contents or SVG paths. */
+[data-theme] :is(.primary-button,.secondary-button,.danger-button,.google-auth-button,.header-action,.icon-button,.theme-card) {
+  transition:background-color 140ms ease,border-color 140ms ease,box-shadow 140ms ease,transform 100ms ease!important;
+}
+[data-theme] :is(.primary-button,.secondary-button,.danger-button,.google-auth-button) {
+  border-radius:var(--ui-radius)!important;
+  box-shadow:var(--ui-shadow)!important;
+  border-width:1px!important;
+  line-height:1.45;
+}
+[data-theme] .primary-button {
+  background:var(--accent)!important;
+  border-color:var(--accent)!important;
+}
+[data-theme] :is(.secondary-button,.google-auth-button) {
+  color:var(--ink)!important;
+  background:var(--control)!important;
+  border-color:var(--ui-edge)!important;
+}
+[data-theme] .danger-button {
+  color:var(--red)!important;
+  background:var(--red-soft)!important;
+  border-color:color-mix(in srgb,var(--red) 50%,var(--line))!important;
+}
+[data-theme] :is(.primary-button,.secondary-button,.danger-button,.google-auth-button):active:not(:disabled) {
+  transform:translateY(1px)!important;
+  box-shadow:inset 0 1px 2px #00000026!important;
+}
+[data-theme] :is(button,a,summary):focus-visible {
+  outline:2px solid var(--accent)!important;
+  outline-offset:3px!important;
+}
+[data-theme] :is(button,input,select,textarea):disabled {
+  opacity:.48;
+  cursor:not-allowed!important;
+}
+[data-theme] :is(button,.primary-button,.secondary-button,.danger-button,.google-auth-button):disabled {
+  transform:none!important;
+  box-shadow:none!important;
+}
+
+/* Text fields retain native date, number and password behavior. */
+[data-theme] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="color"]):not([type="range"]),select,textarea):not(.studio-title) {
+  border-color:var(--ui-edge)!important;
+  border-radius:var(--ui-radius)!important;
+  background:var(--control)!important;
+  transition:border-color 150ms ease,box-shadow 150ms ease!important;
+}
+[data-theme] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="color"]):not([type="range"]),select,textarea):not(.studio-title):focus {
+  border-color:var(--accent)!important;
+  outline:2px solid var(--accent)!important;
+  outline-offset:2px!important;
+  box-shadow:0 0 0 4px var(--ui-ring)!important;
+}
+[data-theme] :is(input,select,textarea):is([aria-invalid="true"],:user-invalid) {
+  border-color:var(--red)!important;
+  outline-color:var(--red)!important;
+}
+[data-theme] .search-box {
+  border-radius:var(--ui-radius)!important;
+  border-color:var(--ui-edge)!important;
+}
+[data-theme] .search-box:focus-within {
+  border-color:var(--accent)!important;
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
+[data-theme] .search-box input,
+[data-theme] .search-box input:focus {
+  border:0!important;
+  outline:0!important;
+  box-shadow:none!important;
+  background:transparent!important;
+}
+
+/* Native marks preserve keyboard, forced-colors and form submission behavior. */
+[data-theme] input:is([type="checkbox"],[type="radio"]) {
+  accent-color:var(--accent);
+  flex-shrink:0;
+}
+[data-theme] input:is([type="checkbox"],[type="radio"]):focus-visible {
+  outline:2px solid var(--accent)!important;
+  outline-offset:3px!important;
+  box-shadow:none!important;
+}
+[data-theme] :is(.check-option,.student-picker label,.permission-option,.switch-row) {
+  min-height:44px;
+}
+[data-theme] .switch-row {position:relative;cursor:pointer}
+[data-theme] .switch-row .switch {
+  width:42px;
+  height:24px;
+  border:1px solid var(--ui-edge);
+  background:var(--surface-2)!important;
+  box-shadow:inset 0 1px 2px #00000020;
+  transition:background-color 150ms ease,border-color 150ms ease;
+}
+[data-theme] .switch-row .switch::after {
+  width:16px;
+  height:16px;
+  top:3px;
+  left:3px;
+  background:var(--muted);
+  box-shadow:0 1px 2px #00000038;
+  transition:transform 150ms ease,background-color 150ms ease;
+}
+[data-theme] .switch-row input:checked+.switch {
+  border-color:var(--accent);
+  background:var(--accent)!important;
+}
+[data-theme] .switch-row input:checked+.switch::after {
+  background:var(--paper);
+  transform:translateX(18px);
+}
+[data-theme] .switch-row input:focus-visible+.switch {
+  outline:2px solid var(--accent)!important;
+  outline-offset:3px;
+}
+[data-theme] .switch-row:has(input:disabled) {cursor:not-allowed;opacity:.48}
+
+/* Shared surfaces exclude board notes, podiums and theme-preview palettes. */
+[data-theme] :is(.announcement-card,.record-card,.theme-card,.create-options) {
+  border-radius:var(--ui-radius)!important;
+  border-color:var(--line)!important;
+  box-shadow:var(--ui-shadow)!important;
+  transition:border-color 150ms ease,box-shadow 150ms ease!important;
+}
+[data-theme] .theme-card[aria-pressed="true"] {
+  border-color:var(--accent)!important;
+  box-shadow:0 0 0 1px var(--accent)!important;
+}
+[data-theme] :is(.school-nav button,.nav-more>summary,.create-options button,.settings-tabs button,.studio-tabs button,.filter-tab) {
+  transition:color 140ms ease,background-color 140ms ease,border-color 140ms ease!important;
+}
+[data-theme] :is(.settings-tabs button,.studio-tabs button) {
+  border-radius:var(--ui-radius)!important;
+}
+[data-theme] :is(.settings-tabs button,.studio-tabs button)[aria-selected="true"] {
+  color:var(--ink)!important;
+  background:var(--accent-soft)!important;
+  border-color:var(--accent)!important;
+}
+[data-theme] .filter-tab.active {
+  color:var(--ink)!important;
+  border-bottom-color:var(--accent)!important;
+}
+[data-theme] .empty-state :is(h2,h3) {color:var(--ink)!important}
+
+/* Dialog layout and scroll behavior remain owned by the existing form styles. */
+[data-theme] :is(.form-dialog,.school-dialog) {
+  border:1px solid var(--ui-edge)!important;
+  border-radius:12px!important;
+  box-shadow:0 20px 64px #00000052!important;
+}
+[data-theme] :is(.form-dialog,.school-dialog)>header {
+  background:var(--surface)!important;
+  border-bottom:1px solid var(--line);
+}
+[data-theme] :is(.form-dialog,.school-dialog)>header :is(.secondary-button,.icon-button) {
+  flex-shrink:0;
+  min-width:44px;
+  min-height:44px;
+}
+/* A viewport-fixed banner hosted by a modal needs the modal's side gutters too. */
+[data-theme] :is(.form-dialog,.school-dialog)>.feedback-region {
+  width:min(320px,calc(100vw - 64px));
+}
+[data-theme] .table-scroll {overscroll-behavior-inline:contain}
+[data-theme] .status-table tbody tr {transition:background-color 140ms ease}
+[data-theme] .status-table tbody tr:focus-within {
+  background:var(--accent-soft);
+}
+
+@media(hover:hover) and (pointer:fine) {
+  [data-theme] .primary-button:hover:not(:disabled):not(:active) {
+    background:var(--accent-hover)!important;
+    border-color:var(--accent-hover)!important;
+    transform:translateY(-1px)!important;
+    box-shadow:0 3px 6px #00000026!important;
+  }
+  [data-theme] :is(.secondary-button,.google-auth-button):hover:not(:disabled):not(:active) {
+    background:var(--surface-2)!important;
+    border-color:var(--muted)!important;
+    transform:translateY(-1px)!important;
+  }
+  [data-theme] .danger-button:hover:not(:disabled) {
+    color:var(--red)!important;
+    background:color-mix(in srgb,var(--red) 18%,var(--surface))!important;
+  }
+  [data-theme] :is(.announcement-card,.record-card,.theme-card):hover:not([aria-pressed="true"]) {
+    border-color:var(--ui-edge)!important;
+  }
+  [data-theme] :is(.school-nav button,.nav-more>summary,.create-options button):hover {
+    color:var(--ink)!important;
+    background:var(--accent-soft)!important;
+  }
+  [data-theme] .status-table tbody tr:hover {background:var(--accent-soft)}
+}
+
+/* Cancel legacy hover rules on touch screens; active/focus still communicate state. */
+@media(hover:none) {
+  [data-theme] .primary-button:hover:not(:active) {
+    background:var(--accent)!important;
+    transform:none!important;
+  }
+  [data-theme] :is(.secondary-button,.google-auth-button):hover:not(:active) {
+    background:var(--control)!important;
+    border-color:var(--ui-edge)!important;
+    transform:none!important;
+  }
+}
+@media(max-width:540px) {
+  [data-theme] :is(.settings-tabs,.studio-tabs) {gap:6px}
+  [data-theme] :is(.settings-tabs,.studio-tabs) button {min-height:44px}
+  [data-theme] :is(.form-dialog,.school-dialog)>header {gap:12px;padding:14px 16px}
+  [data-theme] :is(.form-dialog,.school-dialog)>header h2 {min-width:0;overflow-wrap:anywhere}
+  [data-theme] .school-actions {flex-wrap:wrap}
+}
+@media(prefers-reduced-motion:reduce) {
+  [data-theme] :is(.primary-button,.secondary-button,.danger-button,.google-auth-button,.header-action,.icon-button,.theme-card,.announcement-card,.record-card,.create-options,.school-nav button,.nav-more>summary,.create-options button,.settings-tabs button,.studio-tabs button,.filter-tab,.status-table tbody tr,input,select,textarea,.switch,.switch::after) {
+    transition:none!important;
+  }
+  [data-theme] :is(.primary-button,.secondary-button,.danger-button,.google-auth-button):is(:hover,:active) {transform:none!important}
+}

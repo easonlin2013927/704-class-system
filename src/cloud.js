@@ -21,9 +21,9 @@ async function request(path, options = {}) {
     if(data.code==="PASSWORD_CHANGE_REQUIRED")window.dispatchEvent(new Event("password-required"));
     throw Object.assign(new Error(data.message || "雲端操作失敗，請稍後重試。"),{code:data.code,status:response.status});
   }
-  if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:true}}));
+  if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:true,path}}));
   return data;
-  } catch(error) {if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:false,message:error.message}}));throw error;} finally { if(mutation)window.dispatchEvent(new Event('operation-end')); }
+  } catch(error) {if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:false,path,message:error.message}}));throw error;} finally { if(mutation)window.dispatchEvent(new Event('operation-end')); }
 }
 export const cloud = {
   async loginData(profile,onAccess=()=>{}){

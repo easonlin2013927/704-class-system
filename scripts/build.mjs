@@ -17,6 +17,8 @@ const styles = [
   "resend-system.css",
   "board-honors.css",
   "offline.css",
+  "uiverse-system.css",
+  "feedback.css",
 ];
 
 await rm("dist", { recursive: true, force: true });
