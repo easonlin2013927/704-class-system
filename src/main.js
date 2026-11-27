@@ -3,13 +3,13 @@ import {mountAccountProviders} from './account-providers.js';
 import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
 import { mountProviderLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.39.0";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.39.0';
-import {mountMailboxes} from './mailboxes.js?v=0.39.0';
-import {mountMailTest} from './mail-test.js?v=0.39.0';
-import { portals, portalRole } from "./portal.js?v=0.39.0";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.39.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.39.0';
+import { initConnectivityGuard } from "./connectivity.js?v=0.39.1";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.39.1';
+import {mountMailboxes} from './mailboxes.js?v=0.39.1';
+import {mountMailTest} from './mail-test.js?v=0.39.1';
+import { portals, portalRole } from "./portal.js?v=0.39.1";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.39.1";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.39.1';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 import {isAppWindow,pwaDisplayModes} from './pwa.js';
 import {notify} from './feedback.js';
@@ -194,7 +194,17 @@ for(const type of ['pointerdown','keydown','touchstart'])document.addEventListen
 function syncPresence(){const id=state.session?.id;if(!id||document.visibilityState!=='visible')return;if(presenceUser===id&&Date.now()-presenceLast<40000)return;presenceUser=id;presenceLast=Date.now();cloud.presence({active:Date.now()-lastInteraction<300000}).catch(()=>{});}
 setInterval(syncPresence,45000);
 document.addEventListener('visibilitychange',syncPresence);
+let previousViewKey='';
 function render() {
+  const key=JSON.stringify([activeRole,state.session?.id,state.sessionRestore,state.settingsOpen?state.settingsTab:'',state.adminView,state.schoolView,state.selectedId,state.editingId,state.session?.must_change_password]);
+  renderContent();
+  if(key===previousViewKey)return;
+  previousViewKey=key;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const view=app.querySelector('main');
+  if(typeof view?.animate==='function')view.animate([{opacity:.65},{opacity:1}],{duration:180,easing:'ease-out'});
+}
+function renderContent() {
   disposeSchool();
   if(!state.session || state.themePreview?.accountId!==state.session.id)state.themePreview=null;
   applyTheme(state.themePreview?.theme || state.session?.theme || "dark");

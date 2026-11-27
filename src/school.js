@@ -34,7 +34,7 @@ export async function loadStudentHome(node,user,onNavigate){
  }catch(e){if(node.isConnected)node.innerHTML=`<p role="status">提醒載入失敗：${esc(e.message)}</p>`;}
 }
 export async function mountSchool({node,user,view,notify,navigate,create}){
- disposeSchool();node.innerHTML='<p role="status">載入中…</p>';
+ disposeSchool();node.innerHTML='<p class="ui-loading" role="status">載入中…</p>';
  const ctx={node,user,notify,navigate,create,view};
  const safe=fn=>async event=>{try{await fn(event);}catch(e){notify(e.message,'error');}};
  ctx.safe=safe;
@@ -49,7 +49,7 @@ async function todayCenter(ctx){
  try{data=await api('today');}catch(e){
   if(!node.isConnected)return;
   node.innerHTML=heading('今天','暫時無法載入今天的班級事項。')+`<section class="editor-card"><p role="alert">${esc(e.message)}</p>${button('重新載入','data-today-retry')}</section>`;
-  node.querySelector('[data-today-retry]').onclick=()=>{node.innerHTML='<p role="status">載入中…</p>';return todayCenter(ctx);};
+  node.querySelector('[data-today-retry]').onclick=()=>{node.innerHTML='<p class="ui-loading" role="status">載入中…</p>';return todayCenter(ctx);};
   return;
  }
  if(!node.isConnected)return;

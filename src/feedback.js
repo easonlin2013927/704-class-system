@@ -46,13 +46,15 @@ function showDialog() {
  button.addEventListener('click',()=>dialog.close());
  dialog.addEventListener('keydown',event=>{if(event.key==='Escape')event.stopPropagation();});
  dialog.addEventListener('cancel',event=>{event.preventDefault();event.stopPropagation();dialog.close();});
- dialog.addEventListener('close',()=>{
-  activeDialog=undefined;
-  release(item);
+ dialog.addEventListener('close',async()=>{
   // Preserve a visible banner when its temporary modal host closes.
   if(bannerRegion?.parentNode===dialog)document.body.append(bannerRegion);
-  dialog.remove();
   restoreFocus(previous);
+  const animations=dialog.getAnimations?.().filter(animation=>animation.effect?.target===dialog)||[];
+  if(animations.length)await Promise.race([Promise.allSettled(animations.map(animation=>animation.finished)),new Promise(resolve=>setTimeout(resolve,240))]);
+  activeDialog=undefined;
+  release(item);
+  dialog.remove();
   showDialog();
  },{once:true});
  dialog.showModal();
@@ -68,7 +70,7 @@ function showBanner() {
  }
  const attach=()=>{
   const focused=document.activeElement?.closest('dialog:modal');
-  const host=activeDialog||focused||[...document.querySelectorAll('dialog:modal')].at(-1)||document.body;
+  const host=(activeDialog?.open?activeDialog:null)||focused||[...document.querySelectorAll('dialog:modal')].at(-1)||document.body;
   if(bannerRegion.parentNode!==host)host.append(bannerRegion);
  };
  attach();
