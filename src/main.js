@@ -1,18 +1,19 @@
+import {openDialog,closeDialog} from './dialog-motion.js';
 import {mountClassroomPermissions} from './classroom-permissions.js';
 import {mountAccountProviders} from './account-providers.js';
 import {sanitizeHtml,stripHtml} from './rich-html.js';
 import { cloud } from "./cloud.js";
 import { mountProviderLogin } from "./firebase-auth.js";
-import { initConnectivityGuard } from "./connectivity.js?v=0.39.1";
-import {summarize,exportBroadcast} from './broadcast.js?v=0.39.1';
-import {mountMailboxes} from './mailboxes.js?v=0.39.1';
-import {mountMailTest} from './mail-test.js?v=0.39.1';
-import { portals, portalRole } from "./portal.js?v=0.39.1";
-import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.39.1";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.39.1';
+import { initConnectivityGuard } from "./connectivity.js?v=0.40.0";
+import {summarize,exportBroadcast} from './broadcast.js?v=0.40.0';
+import {mountMailboxes} from './mailboxes.js?v=0.40.0';
+import {mountMailTest} from './mail-test.js?v=0.40.0';
+import { portals, portalRole } from "./portal.js?v=0.40.0";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.40.0";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.40.0';
 import {lineIcon,bindIconMotion} from './interface-icons.js';
 import {isAppWindow,pwaDisplayModes} from './pwa.js';
-import {notify} from './feedback.js';
+import {notify,confirmAction,promptLink} from './feedback.js';
 
 initConnectivityGuard();
 
@@ -138,6 +139,7 @@ window.addEventListener('operation-end',()=>{pendingOperations=Math.max(0,pendin
 let operationNoticeTimer;
 window.addEventListener('operation-result',event=>{
  if(['/login','/auth/firebase','/logout'].includes(event.detail.path))return;
+ if(event.detail.ok&&event.detail.deleted){toast('所選項目已刪除。','success',{presentation:'dialog',title:'刪除成功'});return;}
  if(event.detail.ok){clearTimeout(operationNoticeTimer);operationNoticeTimer=setTimeout(()=>toast('操作完成'),400);}
  else toast(event.detail.message||'操作失敗','error');
 });
@@ -360,7 +362,7 @@ function renderHealthCenter(){
  app.innerHTML=`${headerTemplate()}<main id="main-content" class="editor-shell health-center" tabindex="-1"><button class="back-button" id="health-back">${icon('back',18)} 返回首頁</button><div class="editor-heading"><span class="eyebrow dark">SYSTEM OPERATIONS</span><h1>系統健康與備份中心</h1><p>維護人員可查看 API、資料庫、通知服務與 1.8 TB 資料碟狀態，並建立可下載的資料庫備份。</p></div><p id="health-message" role="status">正在檢查系統…</p><div id="health-summary" class="summary-grid"></div><section class="editor-card"><div class="school-heading"><div><h2>服務健康</h2><p class="muted">資料每次重新整理都會即時檢查。</p></div><button class="secondary-button" id="refresh-health">重新檢查</button></div><div class="table-scroll"><table class="status-table"><tbody id="health-rows"></tbody></table></div></section><section class="editor-card"><div class="school-heading"><div><h2>資料庫備份</h2><p class="muted">備份儲存在 1.8 TB 資料碟；請定期下載到另一台裝置，避免單一硬碟故障。</p></div><button class="primary-button" id="create-backup">立即建立備份</button></div><div class="table-scroll"><table class="status-table"><thead><tr><th>建立時間</th><th>狀態</th><th>內容</th><th>大小</th><th>操作</th></tr></thead><tbody id="backup-rows"></tbody></table></div></section></main>`;
  bindHeader();document.querySelector('#health-back').onclick=goHome;const message=document.querySelector('#health-message'),summary=document.querySelector('#health-summary'),rows=document.querySelector('#health-rows'),backups=document.querySelector('#backup-rows');
  const load=async()=>{try{const [h,list]=await Promise.all([cloud.school('health-center'),cloud.school('backups')]);summary.innerHTML=`<article class="summary-tile"><small>API</small><strong>正常</strong><span>已運作 ${Math.floor(h.api.uptime_seconds/3600)} 小時</span></article><article class="summary-tile"><small>資料庫</small><strong>${h.database.latency_ms} ms</strong><span>${formatBytes(h.database.size_bytes)}</span></article><article class="summary-tile"><small>資料碟可用空間</small><strong>${formatBytes(h.storage.free_bytes)}</strong><span>${escapeHtml(h.storage.path)}</span></article><article class="summary-tile"><small>外部通知</small><strong>${h.services.external_notifications?'開啟':'關閉'}</strong><span>Email ${h.services.email_configured?'已設定':'未設定'}</span></article>`;const info=[['檢查時間',formatDate(h.checked_at,true)],['執行主機',h.api.host],['平台',h.api.platform],['CPU',h.api.cpu],['記憶體',`${formatBytes(h.api.memory_used)} / ${formatBytes(h.api.memory_total)}`],['資料庫連線',`${h.database.connections.active} 使用中 / ${h.database.connections.total} 總計`],['帳號',h.counts.accounts],['公告',h.counts.announcements],['作業',h.counts.homework],['聊天訊息',h.counts.messages]];rows.innerHTML=info.map(([k,v])=>`<tr><th>${escapeHtml(String(k))}</th><td>${escapeHtml(String(v))}</td></tr>`).join('');backups.innerHTML=list.map(x=>`<tr><td>${formatDate(x.created_at,true)}</td><td><span class="status-badge ${x.status==='failed'?'disabled':''}">${x.status==='ready'?'可下載':x.status==='creating'?'建立中':'失敗'}</span></td><td>${x.table_count} 個資料表、${x.row_count} 筆資料${x.error?`<small>${escapeHtml(x.error)}</small>`:''}</td><td>${formatBytes(x.size_bytes)}</td><td>${x.status==='ready'?`<button class="secondary-button" data-backup-download="${x.id}">下載</button>`:''}<button class="danger-button" data-backup-delete="${x.id}">刪除</button></td></tr>`).join('')||'<tr><td colspan="5">尚未建立備份。</td></tr>';message.textContent='';bindBackupActions();}catch(error){message.textContent=error.message;}};
- const bindBackupActions=()=>{backups.querySelectorAll('[data-backup-download]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await cloud.downloadBackup(b.dataset.backupDownload);toast('備份下載完成');}catch(error){toast(error.message,'error');}finally{b.disabled=false;}});backups.querySelectorAll('[data-backup-delete]').forEach(b=>b.onclick=async()=>{if(!confirm('確定刪除此備份？刪除後無法復原。'))return;b.disabled=true;try{await cloud.school(`backups/${b.dataset.backupDelete}`,'DELETE');await load();}catch(error){toast(error.message,'error');b.disabled=false;}});};
+ const bindBackupActions=()=>{backups.querySelectorAll('[data-backup-download]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await cloud.downloadBackup(b.dataset.backupDownload);toast('備份下載完成');}catch(error){toast(error.message,'error');}finally{b.disabled=false;}});backups.querySelectorAll('[data-backup-delete]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await cloud.school(`backups/${b.dataset.backupDelete}`,'DELETE');await load();}catch(error){toast(error.message,'error');b.disabled=false;}});};
  document.querySelector('#refresh-health').onclick=load;document.querySelector('#create-backup').onclick=async event=>{event.currentTarget.disabled=true;message.textContent='正在建立並壓縮備份…';try{await cloud.school('backups','POST',{});toast('備份建立完成','success',{presentation:'dialog',title:'備份已建立'});await load();}catch(error){message.textContent=error.message;}finally{event.currentTarget.disabled=false;}};load();
 }
 
@@ -397,10 +399,10 @@ function renderAccounts() {
  document.querySelector("#reset-password-option").hidden=!account;
  document.querySelector("#person-form-title").textContent=account?"編輯帳號":"新增帳號";
  document.querySelector("#person-password-label").textContent=account?"新密碼（勾選重設密碼後填寫）":"初始密碼";
- document.querySelector("#save-person").textContent=account?"儲存變更":"建立帳號";dialog.showModal();
+ document.querySelector("#save-person").textContent=account?"儲存變更":"建立帳號";openDialog(dialog);
  };
  document.querySelector("#create-person").addEventListener("click",()=>open(null));
- document.querySelector("#close-person").addEventListener("click",()=>dialog.close());
+ document.querySelector("#close-person").addEventListener("click",()=>closeDialog(dialog));
  if(isAdmin)form.elements.require_change_email.addEventListener('change',()=>{document.querySelector('#required-email-label').hidden=!form.elements.require_change_email.checked;});
  form.elements.reset_password.addEventListener("change",()=>{form.elements.password.disabled=!form.elements.reset_password.checked;});
  const refresh=async()=>{
@@ -413,7 +415,7 @@ function renderAccounts() {
  const updateBulkCount=()=>{const count=list.querySelectorAll('[data-account-select]:checked').length;document.querySelector('#account-picked-count').textContent=`已選 ${count} 人`;};
  document.querySelectorAll('[data-account-pick]').forEach(button=>button.addEventListener('click',async()=>{const mode=button.dataset.accountPick;if(mode==='students'&&document.querySelector('#account-filter').value!=='student'){document.querySelector('#account-filter').value='student';await refresh();}list.querySelectorAll('[data-account-select]').forEach(input=>input.checked=mode==='visible'||(mode==='students'&&input.closest('[data-account-role]').dataset.accountRole==='student'));updateBulkCount();}));
  list.addEventListener('change',event=>{if(event.target.matches('[data-account-select]'))updateBulkCount();});
- document.querySelector('#apply-account-bulk').addEventListener('click',async event=>{const ids=[...list.querySelectorAll('[data-account-select]:checked')].map(x=>x.value);if(!ids.length){toast('請先選擇帳號','error');return;}const action=document.querySelector('#account-bulk-action').value;if(['disable'].includes(action)&&!confirm(`確定要對 ${ids.length} 個帳號套用此動作？`))return;event.currentTarget.disabled=true;try{const result=await cloud.bulkAccounts({ids,action});toast(`已更新 ${result.updated} 個帳號`);await refresh();}catch(error){toast(error.message,'error');}finally{event.currentTarget.disabled=false;}});
+ document.querySelector('#apply-account-bulk').addEventListener('click',async event=>{const actionButton=event.currentTarget;const ids=[...list.querySelectorAll('[data-account-select]:checked')].map(x=>x.value);if(!ids.length){toast('請先選擇帳號','error');return;}const action=document.querySelector('#account-bulk-action').value;if(['disable'].includes(action)&&!await confirmAction(`確定要對 ${ids.length} 個帳號套用此動作？`,{title:'確認停用帳號',confirmLabel:'停用'}))return;actionButton.disabled=true;try{const result=await cloud.bulkAccounts({ids,action});toast(`已更新 ${result.updated} 個帳號`);await refresh();}catch(error){toast(error.message,'error');}finally{actionButton.disabled=false;}});
  form.addEventListener("submit",async event=>{
  event.preventDefault();const button=document.querySelector("#save-person"),data=Object.fromEntries(new FormData(form)),id=data.id;delete data.id;
  data.disabled=form.elements.disabled.checked;data.must_change_password=form.elements.must_change_password.checked;
@@ -422,7 +424,7 @@ function renderAccounts() {
  try{
  const result=id?await cloud.updateAccount(id,data):await cloud.createAccount(data);
  if(isAdmin&&id){const permissions={};document.querySelectorAll('[data-permission]').forEach(input=>permissions[input.dataset.permission]=input.checked);if(Object.keys(permissions).length)await cloud.school('permissions/'+id,'PUT',permissions);}
- dialog.close();
+ await closeDialog(dialog);
  if(result.reauthenticate){cancelSessionRestore();cloud.logout();state.session=null;render();toast("帳號已更新，請重新登入");return;}
  toast(id?"帳號已更新":"帳號已建立");await refresh();
  }catch(error){toast(error.message,"error");}finally{button.disabled=false;}
@@ -431,8 +433,8 @@ function renderAccounts() {
  const edit=event.target.closest("[data-edit-account]");if(edit){edit.disabled=true;try{state.accounts=await cloud.accounts();const account=state.accounts.find(item=>item.id===edit.dataset.editAccount);if(!account)throw new Error("帳號已不存在，請重新開啟名單");open(account);}catch(error){toast(error.message,"error");}finally{edit.disabled=false;}return;}
  const button=event.target.closest("[data-remove-account]");if(!button)return;
  const account=state.accounts.find(item=>item.id===button.dataset.removeAccount);
- if(!window.confirm(`確定刪除帳號「${account.display_name}」？`))return;
- try{await cloud.deleteAccount(account.id);toast("帳號已刪除","success",{presentation:"dialog"});await refresh();}catch(error){toast(error.message,"error");}
+
+ try{await cloud.deleteAccount(account.id);await refresh();}catch(error){toast(error.message,"error");}
  });refresh();
 }
 
@@ -463,13 +465,13 @@ setInterval(updateCountdowns,1000);
 function activityCards(isTeacher){return state.countdowns.map(item=>`<article class="editor-card countdown-card"><h3>${escapeHtml(item.title)}</h3><time>${formatDate(item.target_at,true)}</time><p class="countdown-value" data-countdown-at="${escapeHtml(item.target_at)}"></p>${isTeacher?`<button class="secondary-button" data-edit-countdown="${item.id}">編輯</button> <button class="danger-button" data-delete-countdown="${item.id}">刪除</button>`:""}</article>`).join("");}
 function activityDialog(isTeacher){return `${isTeacher?`<dialog id="activity-dialog" class="form-dialog"><button type="button" id="close-activity" class="back-button">關閉</button><form id="countdown-form" class="editor-card"><h3 id="countdown-form-title">新增倒數活動</h3><input type="hidden" name="id"><div class="form-grid"><label>活動名稱<input name="title" required maxlength="80"></label><label>開始時間（目前裝置時區）<input name="target_at" type="datetime-local" required></label><label>結束時間（選填）<input name="ends_at" type="datetime-local"></label></div><footer class="editor-footer"><button class="primary-button">儲存活動</button><button type="reset" class="secondary-button">取消編輯</button></footer></form></dialog>`:""}`;}
 function bindActivities(){
- document.querySelector("#close-activity")?.addEventListener("click",()=>document.querySelector("#activity-dialog").close());
+ document.querySelector("#close-activity")?.addEventListener("click",()=>closeDialog(document.querySelector("#activity-dialog")));
   updateCountdowns();
   const countdownForm=document.querySelector("#countdown-form");
   countdownForm?.addEventListener("submit",async event=>{event.preventDefault();const data=new FormData(countdownForm);const button=countdownForm.querySelector(".primary-button");button.disabled=true;try{await cloud.saveCountdown({title:data.get("title"),target_at:new Date(data.get("target_at")).toISOString(),ends_at:data.get("ends_at")?new Date(data.get("ends_at")).toISOString():null},data.get("id"));state.countdowns=await cloud.countdowns();renderDashboard();toast("活動已儲存");}catch(error){toast(error.message,"error");}finally{button.disabled=false;}});
-  document.querySelectorAll("[data-edit-countdown]").forEach(button=>button.addEventListener("click",()=>{const item=state.countdowns.find(row=>row.id===button.dataset.editCountdown);const date=new Date(item.target_at);const local=new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);countdownForm.elements.id.value=item.id;countdownForm.elements.title.value=item.title;countdownForm.elements.target_at.value=local;countdownForm.elements.ends_at.value=item.ends_at?new Date(new Date(item.ends_at).getTime()-new Date(item.ends_at).getTimezoneOffset()*60000).toISOString().slice(0,16):"";document.querySelector("#countdown-form-title").textContent="編輯倒數活動";document.querySelector("#activity-dialog").showModal();countdownForm.elements.title.focus();}));
+  document.querySelectorAll("[data-edit-countdown]").forEach(button=>button.addEventListener("click",()=>{const item=state.countdowns.find(row=>row.id===button.dataset.editCountdown);const date=new Date(item.target_at);const local=new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);countdownForm.elements.id.value=item.id;countdownForm.elements.title.value=item.title;countdownForm.elements.target_at.value=local;countdownForm.elements.ends_at.value=item.ends_at?new Date(new Date(item.ends_at).getTime()-new Date(item.ends_at).getTimezoneOffset()*60000).toISOString().slice(0,16):"";document.querySelector("#countdown-form-title").textContent="編輯倒數活動";openDialog(document.querySelector("#activity-dialog"));countdownForm.elements.title.focus();}));
   countdownForm?.addEventListener("reset",()=>{document.querySelector("#countdown-form-title").textContent="新增倒數活動";queueMicrotask(()=>{countdownForm.elements.id.value="";});});
-  document.querySelectorAll("[data-delete-countdown]").forEach(button=>button.addEventListener("click",async()=>{if(!confirm("確定刪除此倒數活動？"))return;try{await cloud.deleteCountdown(button.dataset.deleteCountdown);state.countdowns=await cloud.countdowns();renderDashboard();}catch(error){toast(error.message,"error");}}));
+  document.querySelectorAll("[data-delete-countdown]").forEach(button=>button.addEventListener("click",async()=>{try{await cloud.deleteCountdown(button.dataset.deleteCountdown);state.countdowns=await cloud.countdowns();renderDashboard();}catch(error){toast(error.message,"error");}}));
 
 }
 
@@ -510,7 +512,7 @@ function renderDashboard() {
   menu?.addEventListener("mouseleave",()=>showMenu(false));
   menu?.addEventListener("focusout",event=>{if(!menu.contains(event.relatedTarget))showMenu(false);});
   menu?.addEventListener("keydown",event=>{if(event.key==="Escape"){showMenu(false);toggle.focus();}});
-  document.querySelector("#new-activity")?.addEventListener("click",()=>{document.querySelector("#countdown-form").reset();document.querySelector("#activity-dialog")?.showModal();});
+  document.querySelector("#new-activity")?.addEventListener("click",()=>{document.querySelector("#countdown-form").reset();openDialog(document.querySelector("#activity-dialog"));});
   document.querySelector("#new-post")?.addEventListener("click", () => { state.editingId = "new"; render(); });
   document.querySelector("#search").addEventListener("input", (event) => {
     state.search = event.target.value;
@@ -666,10 +668,10 @@ function renderEditor() {
 
 async function deleteAnnouncement(id) {
   const item = state.announcements.find((entry) => entry.id === id);
-  if (!item || !window.confirm(`確定要刪除「${item.title}」嗎？`)) return;
+  if (!item) return;
   try { await cloud.remove(id); } catch (error) { toast(error.message, "error"); return; }
   state.announcements = state.announcements.filter((entry) => entry.id !== id);
-  state.selectedId = null; state.editingId = null; render(); toast("公告已刪除");
+  state.selectedId = null; state.editingId = null; render();
 }
 
 function editorMarkup(content = "") {
@@ -751,9 +753,9 @@ function bindRichEditor() {
     restore();
     document.execCommand("formatBlock", false, event.target.value); editor.focus();
   });
-  document.querySelector("#add-link").addEventListener("mousedown", (event) => {
-    event.preventDefault(); const url = window.prompt("請輸入連結網址：", "https://");
-    if (url && /^https?:\/\//i.test(url)) document.execCommand("createLink", false, url);
+  document.querySelector("#add-link").addEventListener("mousedown", async (event) => {
+    event.preventDefault(); const url = await promptLink();
+    if (url && /^https?:\/\//i.test(url)){restore();document.execCommand("createLink", false, url);}
   });
   return editor;
 }
@@ -811,7 +813,7 @@ function bindComments(item){
  const message=document.querySelector("#comments-message"),list=document.querySelector("#comments-list"),form=document.querySelector("#comment-form");
  const load=async()=>{try{const data=await cloud.comments(item.id);if(!list.isConnected)return;form.hidden=!data.enabled;message.textContent=data.enabled?(data.comments.length?`${data.comments.length} 則評論`:"還沒有評論，來發表第一則吧。"):"此公告尚未開啟評論區。";list.innerHTML=data.comments.map(comment=>`<article class="comment-row">${avatarMarkup(comment.author,comment.avatar_url,"mini")}<div class="comment-body"><strong>${escapeHtml(identityName(comment.author,comment.nickname))}</strong><time>${formatDate(comment.created_at,true)}</time><p>${escapeHtml(comment.content)}</p>${comment.can_delete?`<button type="button" class="secondary-button" data-delete-comment="${comment.id}">刪除評論</button>`:""}</div></article>`).join("");}catch(error){message.textContent=error.message;}};
  form.addEventListener("submit",async event=>{event.preventDefault();const button=form.querySelector("button"),content=new FormData(form).get("content");button.disabled=true;try{await cloud.addComment(item.id,content);form.reset();await load();}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
- list.addEventListener("click",async event=>{const button=event.target.closest("[data-delete-comment]");if(!button)return;if(button.dataset.confirmed!=="yes"){button.dataset.confirmed="yes";button.textContent="確定刪除評論";return;}button.disabled=true;try{await cloud.deleteComment(item.id,button.dataset.deleteComment);await load();}catch(error){message.textContent=error.message;button.disabled=false;}});load();
+ list.addEventListener("click",async event=>{const button=event.target.closest("[data-delete-comment]");if(!button)return;button.disabled=true;try{await cloud.deleteComment(item.id,button.dataset.deleteComment);await load();}catch(error){message.textContent=error.message;button.disabled=false;}});load();
 }
 function settingsTabs(){return `<nav class="settings-tabs" aria-label="設定分類"><button class="secondary-button" data-settings-tab="personal" aria-current="${state.settingsTab==="personal"?'page':'false'}">個人化</button><button class="secondary-button" data-settings-tab="account" aria-current="${state.settingsTab==='account'?'page':'false'}">帳號管理</button><button class="secondary-button" data-settings-tab="notifications" aria-current="${state.settingsTab==='notifications'?'page':'false'}">通知</button>${state.session.role==='teacher'||state.session.permissions?.site_settings?`<button class="secondary-button" data-settings-tab="site" aria-current="${state.settingsTab==="site"?'page':'false'}">網站設定</button>`:""}</nav>`;}
 function bindSettingsTabs(){document.querySelectorAll("[data-settings-tab]").forEach(button=>button.addEventListener("click",()=>{state.settingsTab=button.dataset.settingsTab;render();}));}

@@ -1,3 +1,4 @@
+import {openDialog,closeDialog} from './dialog-motion.js';
 import {cloud} from './cloud.js';
 import {prepareFirebaseAuth,authorizeProviderAccount,providerLoginError,providerButtonLabel,loginProviders} from './firebase-auth.js';
 
@@ -7,7 +8,7 @@ export function mountAccountProviders(host,onSignOut){
  let selected,firebase=null,busy=false,providers=[];
  const setBusy=value=>{busy=value;confirm.disabled=value;cancel.disabled=value;confirm.setAttribute('aria-busy',String(value));};
  dialog.addEventListener('cancel',event=>{if(busy)event.preventDefault();else form.reset();});
- cancel.onclick=()=>{form.reset();dialog.close();};
+ cancel.onclick=()=>{form.reset();closeDialog(dialog);};
  host.querySelectorAll('[data-provider-card]').forEach(card=>card.querySelector('[data-provider-action]').onclick=()=>{
   selected=providers.find(provider=>provider.id===card.dataset.providerCard);if(!selected)return;
   form.reset();dialogStatus.textContent='';
@@ -15,7 +16,7 @@ export function mountAccountProviders(host,onSignOut){
   host.querySelector('[data-provider-explanation]').textContent=selected.linked?`解除後，使用這個 ${selected.name} 帳戶登入的裝置將登出。你仍可使用系統帳密登入。`:`請確認 704 系統密碼，再授權你要用於登入的 ${selected.name} 帳戶。`;
   if(selected.linked){confirm.classList.remove('google-auth-button');confirm.textContent='確認解除綁定';}
   else providerButtonLabel(confirm,`連接 ${selected.name} 帳戶`,selected.id);
-  dialog.showModal();
+  openDialog(dialog);
  });
  async function refresh(){
   const data=await cloud.providers();if(!host.isConnected)return;
@@ -34,13 +35,13 @@ export function mountAccountProviders(host,onSignOut){
   const current_password=form.elements.current_password.value;
   try{
    if(selected.linked){
-    const result=await cloud.unlinkProvider(selected.id,{current_password});form.reset();dialog.close();
+    const result=await cloud.unlinkProvider(selected.id,{current_password});form.reset();await closeDialog(dialog);
     if(result.sign_out){onSignOut?.();return;}
     status.textContent=`${selected.name} 綁定已解除。`;
    }else{
     if(!firebase)throw new Error('登入服務尚未準備完成，請稍後再試');
     await authorizeProviderAccount(firebase.sdk,firebase.auth,token=>{dialogStatus.textContent=`正在綁定 ${selected.name} 帳戶…`;return cloud.bindProvider(selected.id,{token,current_password});},selected.id);
-    form.reset();dialog.close();status.textContent=`${selected.name} 帳戶已綁定，下次可直接使用此服務登入。`;
+    form.reset();await closeDialog(dialog);status.textContent=`${selected.name} 帳戶已綁定，下次可直接使用此服務登入。`;
    }
    await refresh();
   }catch(error){if(host.isConnected)(dialog.open?dialogStatus:status).textContent=providerLoginError(error,selected.id).message;}

@@ -1,19 +1,28 @@
 /* Native dialogs keep feedback above existing forms without replacing them. */
+.feedback-dialog .feedback-input-label{display:block;margin-bottom:8px;text-align:left;font-size:14px}
+.feedback-dialog .feedback-input{box-sizing:border-box;width:100%;min-height:44px;margin-bottom:24px;padding:10px 12px;color:var(--feedback-ink);background:var(--feedback-surface);border:1px solid var(--feedback-line);border-radius:8px;font:inherit}
 .feedback-dialog,.feedback-region{--feedback-surface:var(--surface,#fff);--feedback-ink:var(--ink,#202020);--feedback-line:var(--line-strong,#737373);--feedback-error:var(--red,#b42318);--feedback-success:var(--green,#147d42);font-family:inherit;color:var(--feedback-ink);box-sizing:border-box}
 .feedback-dialog{width:min(400px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 32px);margin:auto;padding:32px 28px 24px;overflow:auto;text-align:center;background:var(--feedback-surface);border:1px solid var(--feedback-line);border-radius:16px;box-shadow:0 24px 90px #0005;animation:feedback-appear 150ms ease-out}
 .feedback-dialog::backdrop{background:#0008;backdrop-filter:blur(3px)}
 .feedback-dialog .feedback-mark{position:relative;display:block;width:56px;height:56px;margin:0 auto 20px;color:var(--feedback-success);border:1px solid currentColor;border-radius:50%}
 .feedback-dialog[data-tone="error"] .feedback-mark{color:var(--feedback-error)}
+.feedback-dialog[data-tone="danger"] .feedback-mark,.feedback-dialog[data-tone="warning"] .feedback-mark{color:var(--feedback-error)}
 .feedback-mark::before,.feedback-mark::after{position:absolute;display:block;content:"";background:currentColor;border-radius:2px}
 .feedback-dialog[data-tone="error"] .feedback-mark::before,.feedback-dialog[data-tone="error"] .feedback-mark::after{width:26px;height:2px;left:14px;top:26px;transform:rotate(45deg)}
 .feedback-dialog[data-tone="error"] .feedback-mark::after{transform:rotate(-45deg)}
+.feedback-dialog[data-tone="danger"] .feedback-mark::before,.feedback-dialog[data-tone="warning"] .feedback-mark::before{width:2px;height:20px;left:26px;top:12px}
+.feedback-dialog[data-tone="danger"] .feedback-mark::after,.feedback-dialog[data-tone="warning"] .feedback-mark::after{width:3px;height:3px;left:25.5px;top:38px}
 .feedback-dialog[data-tone="success"] .feedback-mark::before{width:12px;height:2px;left:12px;top:29px;transform:rotate(45deg)}
 .feedback-dialog[data-tone="success"] .feedback-mark::after{width:24px;height:2px;left:19px;top:25px;transform:rotate(-45deg)}
 .feedback-dialog .feedback-title{margin:0 0 12px;color:var(--feedback-ink);font-size:20px;font-weight:650;line-height:1.4;overflow-wrap:anywhere}
 .feedback-dialog .feedback-message{margin:0 0 26px;color:var(--feedback-ink);font-size:14px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
 .feedback-dialog .feedback-confirm{display:block;width:100%;min-height:44px;padding:10px 20px;border:1px solid var(--feedback-ink);border-radius:8px;background:var(--feedback-ink);color:var(--feedback-surface);font:inherit;font-size:14px;font-weight:650;cursor:pointer;box-shadow:none;transition:opacity 120ms ease}
 .feedback-dialog .feedback-confirm:hover{opacity:.84}
-.feedback-dialog .feedback-confirm:focus-visible,.feedback-region .feedback-dismiss:focus-visible{outline:2px solid var(--feedback-ink);outline-offset:4px}
+.feedback-dialog .feedback-actions{display:flex;gap:12px}
+.feedback-dialog .feedback-actions>button{flex:1;min-width:0}
+.feedback-dialog .feedback-cancel{min-height:44px;padding:10px 20px;border:1px solid var(--feedback-line);border-radius:8px;background:var(--feedback-surface);color:var(--feedback-ink);font:inherit;font-size:14px;font-weight:650;cursor:pointer;box-shadow:none}
+.feedback-dialog[data-tone="danger"] .feedback-confirm,.feedback-dialog[data-tone="warning"] .feedback-confirm{border-color:var(--feedback-error);background:var(--feedback-error);color:#fff}
+.feedback-dialog .feedback-confirm:focus-visible,.feedback-dialog .feedback-cancel:focus-visible,.feedback-region .feedback-dismiss:focus-visible{outline:2px solid var(--feedback-ink);outline-offset:4px}
 .feedback-region{position:fixed;z-index:2147483647;top:calc(16px + env(safe-area-inset-top));left:50%;width:min(480px,calc(100vw - 32px));transform:translateX(-50%);pointer-events:none}
 .feedback-region .feedback-banner{display:flex;align-items:flex-start;gap:14px;padding:14px 14px 14px 18px;border:1px solid var(--feedback-line);border-left:3px solid var(--feedback-success);border-radius:10px;background:var(--feedback-surface);color:var(--feedback-ink);box-shadow:0 8px 32px #0003;pointer-events:auto;animation:feedback-appear 150ms ease-out}
 .feedback-region .feedback-banner[data-tone="error"]{border-left-color:var(--feedback-error)}

@@ -1,3 +1,4 @@
+import {openDialog,closeDialog} from './dialog-motion.js';
 import {cloud} from './cloud.js';
 import {lineIcon} from './interface-icons.js';
 
@@ -23,14 +24,14 @@ export async function renderBoard(ctx){
  };
  const showDialog=(title,body)=>{
   node.querySelector('#board-dialog')?.remove();node.insertAdjacentHTML('beforeend',`<dialog id="board-dialog" class="form-dialog school-dialog" aria-labelledby="board-dialog-title"><header><h2 id="board-dialog-title">${esc(title)}</h2><button type="button" class="secondary-button" data-close>關閉</button></header><div class="board-post">${body}</div></dialog>`);
-  const dialog=node.querySelector('#board-dialog');dialog.showModal();return dialog;
+  const dialog=node.querySelector('#board-dialog');openDialog(dialog);return dialog;
  };
  const details=post=>{
   const dialog=showDialog(post.author_name+'的便利貼',`<time>${esc(stamp(post.created_at))}</time><p class="classroom-text">${esc(post.content)}</p><section class="board-replies" aria-label="公開回覆">${(post.replies||[]).map(reply=>`<article><header><strong>${esc(reply.author_name)}</strong><time>${esc(stamp(reply.created_at))}</time></header><p class="classroom-text">${esc(reply.content)}</p></article>`).join('')||'<p class="muted">尚無回覆</p>'}</section>${mayReply?'<form id="board-reply-form"><label>公開回覆<textarea name="content" rows="3" maxlength="2000" required></textarea></label><button type="submit" class="secondary-button">公開回覆</button></form>':''}${post.author_id===user.id||user.role==='admin'||user.permissions?.board_manage===true?'<button type="button" class="danger-button" data-delete-note>刪除便利貼</button>':''}`);
   const form=dialog.querySelector('form');
-  if(form)form.onsubmit=ctx.safe(async event=>{event.preventDefault();const button=form.querySelector('[type="submit"]');button.disabled=true;try{await api('board/'+post.id+'/replies','POST',{content:new FormData(form).get('content')});dialog.close();await refresh();notify('回覆已公開');}finally{button.disabled=false;}});
+  if(form)form.onsubmit=ctx.safe(async event=>{event.preventDefault();const button=form.querySelector('[type="submit"]');button.disabled=true;try{await api('board/'+post.id+'/replies','POST',{content:new FormData(form).get('content')});await closeDialog(dialog);await refresh();notify('回覆已公開');}finally{button.disabled=false;}});
   const remove=dialog.querySelector('[data-delete-note]');
-  if(remove)remove.onclick=ctx.safe(async()=>{if(remove.dataset.confirm!=='yes'){remove.dataset.confirm='yes';remove.textContent='再次點擊確認刪除';return;}remove.disabled=true;try{await api('board/'+post.id,'DELETE');dialog.close();await refresh();notify('便利貼已刪除');}finally{remove.disabled=false;}});
+  if(remove)remove.onclick=ctx.safe(async()=>{remove.disabled=true;try{await api('board/'+post.id,'DELETE');await closeDialog(dialog);await refresh();}finally{remove.disabled=false;}});
  };
  const bindMove=(paper,post)=>{
   const handle=paper.querySelector('[data-note-move]');if(!handle)return;
@@ -83,7 +84,7 @@ export async function renderBoard(ctx){
   const form=dialog.querySelector('form');form.onsubmit=ctx.safe(async event=>{
    event.preventDefault();const button=form.querySelector('[type="submit"]');button.disabled=true;
    const x=clamp((viewport.scrollLeft+viewport.clientWidth/2-140)/(stage.clientWidth-210)),y=clamp((viewport.scrollTop+viewport.clientHeight/2-180)/(stage.clientHeight-230));
-   try{await api('board','POST',{content:new FormData(form).get('content'),position_x:x,position_y:y});dialog.close();await refresh();notify('便利貼已貼上');}finally{button.disabled=false;}
+   try{await api('board','POST',{content:new FormData(form).get('content'),position_x:x,position_y:y});await closeDialog(dialog);await refresh();notify('便利貼已貼上');}finally{button.disabled=false;}
   });
  };
  more.onclick=ctx.safe(async()=>{pages++;more.disabled=true;try{await refresh();}finally{more.disabled=false;}});

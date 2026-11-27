@@ -36,11 +36,13 @@ async page=>{
  const input=page.locator('input[name=nickname]');
  await input.focus();
  check(await input.evaluate(node=>getComputedStyle(node).boxShadow)!=='none','Text field has focus depth');
- await page.evaluate(()=>{
-  const node=document.createElement('dialog');node.className='form-dialog';node.id='motion-dialog';node.innerHTML='<header><h2>新增項目</h2><button type="button">關閉</button></header><form><label>名稱<input></label></form>';document.body.append(node);node.showModal();
+ await page.evaluate(async()=>{
+  const {openDialog}=await import('/src/dialog-motion.js');
+  const node=document.createElement('dialog');node.className='form-dialog';node.id='motion-dialog';node.innerHTML='<header><h2>新增項目</h2><button type="button">關閉</button></header><form><label>名稱<input></label></form>';document.body.append(node);openDialog(node);
  });
- check(await page.locator('#motion-dialog').evaluate(node=>getComputedStyle(node).transitionProperty.includes('overlay')),'Dialog supports discrete overlay exit');
+ check(await page.locator('#motion-dialog').evaluate(node=>getComputedStyle(node).transitionProperty.includes('opacity')),'Dialog supports explicit fade exit');
  await page.waitForTimeout(230);
+ check(await page.locator('#motion-dialog').evaluate(node=>parseFloat(getComputedStyle(node,'::backdrop').backdropFilter.replace(/[^\d.]/g,'')))===5,'Open dialog blurs background');
  check(await page.locator('#motion-dialog').evaluate(node=>getComputedStyle(node).transform)==='none','Open dialog does not trap fixed notifications');
  await page.evaluate(async()=>{
   const dialog=document.querySelector('#motion-dialog');
@@ -49,8 +51,11 @@ async page=>{
  });
  check((await page.locator('.feedback-banner').boundingBox()).y<100,'Notification remains at viewport top in a scrolled dialog');
  await page.locator('.feedback-dismiss').click();
- const exit=await page.evaluate(()=>{const dialog=document.querySelector('#motion-dialog');dialog.close();return {open:dialog.open,animations:dialog.getAnimations().length,display:getComputedStyle(dialog).display};});
- check(!exit.open&&exit.animations>0&&exit.display!=='none','Native close starts exit without keeping dialog open');
+ const exit=await page.evaluate(async()=>{const {closeDialog}=await import('/src/dialog-motion.js');const dialog=document.querySelector('#motion-dialog');closeDialog(dialog);return {open:dialog.open,closing:dialog.hasAttribute('data-dialog-closing')};});
+ check(exit.open&&exit.closing,'Exit keeps native top layer until fade finishes');
+ await page.waitForTimeout(90);
+ const opacity=await page.locator('#motion-dialog').evaluate(node=>Number(getComputedStyle(node).opacity));
+ check(opacity>0&&opacity<1,'Dialog visibly fades during exit');
  await page.waitForTimeout(230);
  check(await page.locator('#motion-dialog').evaluate(node=>getComputedStyle(node).display)==='none','Dialog finishes exit');
  await page.evaluate(()=>document.querySelector('#motion-dialog').remove());
@@ -64,10 +69,10 @@ async page=>{
   const first=document.createElement('button');first.id='motion-first';first.textContent='原按鈕';
   const next=document.createElement('input');next.id='motion-next';document.body.append(first,next);first.focus();
   const {notify}=await import('/src/feedback.js');notify('焦點測試','error');
+  document.querySelector('.feedback-dialog').addEventListener('close',()=>next.focus(),{once:true});
  });
  await page.waitForTimeout(230);
  await page.locator('.feedback-confirm').click();
- await page.evaluate(()=>document.querySelector('#motion-next').focus());
  await page.locator('.feedback-dialog').waitFor({state:'detached'});
  check(await page.locator('#motion-next').evaluate(node=>node===document.activeElement),'Exit cleanup does not steal new focus');
  await page.evaluate(()=>{document.querySelector('#motion-first').remove();document.querySelector('#motion-next').remove();});

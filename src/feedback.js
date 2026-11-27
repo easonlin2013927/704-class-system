@@ -1,3 +1,4 @@
+import {openDialog,closeDialog} from './dialog-motion.js';
 const dialogs = [];
 const banners = [];
 const errors = new Set();
@@ -39,13 +40,41 @@ function showDialog() {
  message.id='feedback-dialog-message';
  const button=element('button','feedback-confirm','確定');
  button.type='button';
- button.autofocus=true;
- dialog.append(mark,title,message,button);
+ const input=item.input?element('input','feedback-input'):null;
+ let inputLabel;
+ if(input){
+  input.id='feedback-link-url';input.type='url';input.required=true;input.pattern='https?://.+';input.value='https://';
+  inputLabel=element('label','feedback-input-label','連結網址');inputLabel.htmlFor=input.id;
+  mark.hidden=true;
+  input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();choose(true);}});
+ }
+ let confirmed=false,decided=false;
+ const choose=value=>{
+  if(decided)return;
+  if(value&&input&&!input.reportValidity())return;
+  decided=true;confirmed=value;
+  dialog.querySelectorAll('.feedback-confirm,.feedback-cancel').forEach(control=>control.disabled=true);
+  closeDialog(dialog);
+ };
+ let focusTarget=button;
+ if(item.resolve){
+  const actions=element('div','feedback-actions');
+  const cancel=element('button','feedback-cancel','取消');
+  cancel.type='button';
+  button.textContent=item.confirmLabel;
+  cancel.addEventListener('click',()=>choose(false));
+  actions.append(cancel,button);
+  dialog.append(mark,title,message);
+  if(input)dialog.append(inputLabel,input);
+  dialog.append(actions);
+  focusTarget=input||cancel;
+ }else dialog.append(mark,title,message,button);
+ focusTarget.autofocus=true;
  document.body.append(dialog);
  activeDialog=dialog;
- button.addEventListener('click',()=>dialog.close());
+ button.addEventListener('click',()=>choose(true));
  dialog.addEventListener('keydown',event=>{if(event.key==='Escape')event.stopPropagation();});
- dialog.addEventListener('cancel',event=>{event.preventDefault();event.stopPropagation();dialog.close();});
+ dialog.addEventListener('cancel',event=>{event.preventDefault();event.stopPropagation();choose(false);});
  dialog.addEventListener('close',async()=>{
   // Preserve a visible banner when its temporary modal host closes.
   if(bannerRegion?.parentNode===dialog)document.body.append(bannerRegion);
@@ -55,10 +84,22 @@ function showDialog() {
   activeDialog=undefined;
   release(item);
   dialog.remove();
+  item.resolve?.(input?(confirmed?input.value:null):confirmed);
   showDialog();
  },{once:true});
- dialog.showModal();
- button.focus({preventScroll:true});
+ openDialog(dialog);
+ focusTarget.focus({preventScroll:true});
+}
+
+export async function confirmAction(message,{title='確認刪除',confirmLabel='刪除',tone='danger'}={}) {
+ return new Promise(resolve=>{
+  dialogs.push({message:String(message??'').trim(),title:String(title),confirmLabel:String(confirmLabel),tone:tone==='warning'?'warning':'danger',resolve});
+  showDialog();
+ });
+}
+
+export function promptLink(){
+ return new Promise(resolve=>{dialogs.push({message:'輸入要加入的 HTTP 或 HTTPS 網址。',title:'新增連結',confirmLabel:'加入連結',tone:'neutral',input:true,resolve});showDialog();});
 }
 
 function showBanner() {

@@ -1,7 +1,22 @@
 import { config } from "./config.js?v=0.27.1";
+import {confirmAction} from './feedback.js';
 let token = null;
+const pendingDeletes=new Set();
 async function request(path, options = {}) {
   if (!config.url) throw new Error("系統尚未設定雲端服務，請聯絡管理員。");
+  const bulk=/^\/school\/(?:grades|homework|records)-bulk$/.test(path)&&options.method==='PATCH'?JSON.parse(options.body||'{}'):null;
+  const deletion=!options.silent&&((options.method==='DELETE'&&!/^\/(?:account\/providers\/|school\/(?:push-subscription|security-sessions|chat-blocks)(?:\/|$))/.test(path))||bulk?.action==='delete');
+  const deleteKey=deletion?path+'\n'+(options.body||''):null;
+  if(deleteKey&&pendingDeletes.has(deleteKey))throw Object.assign(new Error(''),{name:'AbortError',code:'USER_CANCELLED'});
+  if(deletion){
+    pendingDeletes.add(deleteKey);
+    const labels=[[/^\/admin\/accounts\//,'帳號'],[/\/comments\//,'評論'],[/^\/announcements\//,'公告'],[/^\/countdowns\//,'倒數活動'],[/\/backups\//,'備份'],[/\/board\//,'便利貼'],[/\/grades(?:\/|-bulk)/,'成績'],[/\/homework(?:\/|-bulk)/,'作業'],[/\/records(?:\/|-bulk)/,'學生紀錄'],[/\/messages\//,'訊息'],[/\/mailboxes\//,'電子郵件信箱']];
+    const label=labels.find(([pattern])=>pattern.test(path))?.[1]||'項目';
+    const message=`確定刪除${bulk?.ids?.length?`這 ${bulk.ids.length} 筆`:'這個'}${label}？刪除後無法復原。`;
+    let confirmed=false;
+    try{confirmed=await confirmAction(message);}finally{if(!confirmed)pendingDeletes.delete(deleteKey);}
+    if(!confirmed)throw Object.assign(new Error(''),{name:'AbortError',code:'USER_CANCELLED'});
+  }
   const mutation=!!options.method && options.method!=='GET' && !options.silent;
   if(mutation)window.dispatchEvent(new Event('operation-start'));
   try {
@@ -21,9 +36,9 @@ async function request(path, options = {}) {
     if(data.code==="PASSWORD_CHANGE_REQUIRED")window.dispatchEvent(new Event("password-required"));
     throw Object.assign(new Error(data.message || "雲端操作失敗，請稍後重試。"),{code:data.code,status:response.status});
   }
-  if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:true,path}}));
+  if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:true,path,deleted:deletion}}));
   return data;
-  } catch(error) {if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:false,path,message:error.message}}));throw error;} finally { if(mutation)window.dispatchEvent(new Event('operation-end')); }
+  } catch(error) {if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:false,path,message:error.message}}));throw error;} finally { if(mutation)window.dispatchEvent(new Event('operation-end'));if(deleteKey)pendingDeletes.delete(deleteKey); }
 }
 export const cloud = {
   async loginData(profile,onAccess=()=>{}){
@@ -64,7 +79,7 @@ export const cloud = {
     finally{window.dispatchEvent(new Event('operation-end'));}
   },
   attachments(post){return request('/school/attachments?post='+encodeURIComponent(post));},
-  async uploadAttachment(post,file,onProgress=()=>{}){if(file.size>400*1024*1024)throw new Error('單一公告附件不能超過 400 MB');const entry=await request('/school/attachments',{method:'POST',body:JSON.stringify({announcement_id:post,name:file.name,type:file.type||'application/octet-stream',size:file.size})});try{const chunkSize=4*1024*1024;for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){const part=file.slice(offset,Math.min(file.size,offset+chunkSize)),complete=offset+part.size>=file.size;const response=await fetch(config.url.replace(/\/$/,'')+'/school/attachments/'+entry.id+'?complete='+complete,{method:'PATCH',credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/octet-stream'},body:part});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||'公告附件上傳失敗');onProgress(file.size?Math.min(100,Math.round((offset+part.size)/file.size*100)):100);}}catch(e){await request('/school/attachments/'+entry.id,{method:'DELETE'}).catch(()=>{});throw e;}},
+  async uploadAttachment(post,file,onProgress=()=>{}){if(file.size>400*1024*1024)throw new Error('單一公告附件不能超過 400 MB');const entry=await request('/school/attachments',{method:'POST',body:JSON.stringify({announcement_id:post,name:file.name,type:file.type||'application/octet-stream',size:file.size})});try{const chunkSize=4*1024*1024;for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){const part=file.slice(offset,Math.min(file.size,offset+chunkSize)),complete=offset+part.size>=file.size;const response=await fetch(config.url.replace(/\/$/,'')+'/school/attachments/'+entry.id+'?complete='+complete,{method:'PATCH',credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/octet-stream'},body:part});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||'公告附件上傳失敗');onProgress(file.size?Math.min(100,Math.round((offset+part.size)/file.size*100)):100);}}catch(e){await request('/school/attachments/'+entry.id,{method:'DELETE',silent:true}).catch(()=>{});throw e;}},
   downloadAttachment(id){const anchor=document.createElement('a');anchor.href=config.url.replace(/\/$/,'')+'/school/attachments/'+encodeURIComponent(id);anchor.rel='noopener';document.body.append(anchor);anchor.click();anchor.remove();},
   async uploadChatAttachment(messageId,file,onProgress=()=>{}){
     if(!(file instanceof File))throw new Error('請選擇要傳送的檔案');

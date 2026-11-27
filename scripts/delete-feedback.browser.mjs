@@ -1,0 +1,82 @@
+async page=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ const checks=[];const check=(value,label)=>{if(!value)throw Error(label);checks.push(label);};
+ let deletes=0,fail=false,accountRemoved=false;
+ const actor={id:'10000000-0000-4000-8000-000000000001',role:'admin',display_name:'Preview Admin',theme:'dark'};
+ const account={id:'10000000-0000-4000-8000-000000000002',role:'student',display_name:'Preview Student',email:'preview',disabled:false};
+ await page.route('**/preview-api/**',async route=>{
+  const request=route.request(),path=new URL(request.url()).pathname.replace('/preview-api','');
+  let body=[],status=200;
+  if(request.method()==='DELETE'||(path.endsWith('-bulk')&&request.method()==='PATCH')){
+   deletes++;if(fail){status=403;body={message:'目前沒有刪除權限'};}else{body={ok:true};if(path.startsWith('/admin/accounts/'))accountRemoved=true;}
+  }else if(path==='/me')body=actor;
+  else if(path==='/public/auth-config')body={firebase:{enabled:false}};
+  else if(path==='/public/banner')body={enabled:false,content:''};
+  else if(path==='/school/permissions')body={permissions:{accounts:true,site_settings:true}};
+  else if(path==='/school/preferences')body={favorites:[]};
+  else if(path==='/school/mailboxes')body=[{id:'mail',address:'preview@example.test',verified:true}];
+  else if(path==='/admin/accounts')body=accountRemoved?[]:[account];
+  await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
+ });
+ await page.goto('http://127.0.0.1:4173/?delete-check='+Date.now()+'#/admin/login');
+ await page.locator('.topbar').waitFor();
+ const start=()=>page.evaluate(async()=>{const {cloud}=await import('/src/cloud.js');window.deleteOutcome='pending';cloud.deleteCountdown('preview').then(()=>window.deleteOutcome='success').catch(error=>window.deleteOutcome=error.code==='USER_CANCELLED'?'cancelled':'failed');});
+ const cancelled=async()=>{await page.locator('.feedback-dialog').waitFor({state:'detached'});await page.waitForFunction(()=>window.deleteOutcome==='cancelled');};
+ await start();await page.locator('.feedback-cancel').waitFor();
+ check(deletes===0,'No request before confirmation');
+ check(await page.locator('.feedback-cancel').evaluate(node=>node===document.activeElement),'Cancel receives default focus');
+ await page.locator('.feedback-cancel').click();await cancelled();
+ check(deletes===0,'Cancel does not delete');
+ await start();await page.locator('.feedback-cancel').waitFor();await page.keyboard.press('Escape');await cancelled();
+ check(deletes===0,'Escape does not delete');
+ await start();await page.locator('.feedback-confirm').focus();await page.keyboard.press('Escape');await page.keyboard.press('Enter');await cancelled();
+ check(deletes===0,'Escape choice cannot turn into deletion during exit');
+ await start();await start();await page.locator('.feedback-cancel').click();await cancelled();
+ check(deletes===0,'Repeated delete clicks share one confirmation and send no request after cancel');
+ await start();await page.locator('.feedback-cancel').waitFor();await page.evaluate(()=>document.querySelector('.feedback-dialog').close());await cancelled();
+ check(deletes===0,'External close never approves deletion');
+ fail=true;await start();await page.locator('.feedback-confirm').click();
+ await page.locator('.feedback-dialog[data-tone=error]').waitFor();
+ check(deletes===1,'Confirmed deletion sends one request');
+ check(await page.locator('.feedback-dialog[data-tone=success]').count()===0,'Failed deletion never reports success');
+ await page.locator('.feedback-confirm').click();await page.locator('.feedback-dialog').waitFor({state:'detached'});
+ fail=false;await start();await page.locator('.feedback-confirm').click();
+ await page.locator('.feedback-dialog[data-tone=success]').waitFor();
+ check(deletes===2,'Successful deletion sends one request');
+ check((await page.locator('.feedback-title').textContent())==='刪除成功','Delete success has explicit title');
+ check(await page.locator('.feedback-mark').evaluate(node=>getComputedStyle(node).color)==='rgb(74, 222, 128)','Success uses green circle mark');
+ await page.waitForTimeout(230);
+ await page.screenshot({path:'.taste-skill/delete-success.png'});
+ await page.locator('.feedback-confirm').click();await page.locator('.feedback-dialog').waitFor({state:'detached'});
+ await page.evaluate(async()=>{const {cloud}=await import('/src/cloud.js');cloud.school('homework-bulk','PATCH',{ids:['one','two'],action:'delete'}).catch(error=>window.deleteOutcome=error.code);});
+ await page.locator('.feedback-cancel').waitFor();
+ check((await page.locator('.feedback-message').textContent()).includes('2 筆'),'Bulk confirmation identifies count');
+ await page.locator('.feedback-cancel').click();await page.locator('.feedback-dialog').waitFor({state:'detached'});
+ check(deletes===2,'Cancelled bulk deletion sends no request');
+ await page.locator('#open-accounts').click();
+ const remove=page.locator('[data-remove-account]').first();await remove.waitFor();await remove.click();
+ await page.locator('.feedback-cancel').click();await page.locator('.feedback-dialog').waitFor({state:'detached'});
+ check(await remove.isEnabled(),'Account delete remains usable after cancel');
+ await remove.click();await page.locator('.feedback-confirm').click();
+ await page.locator('.feedback-dialog[data-tone=success]').waitFor();
+ await page.waitForFunction(()=>document.querySelectorAll('[data-remove-account]').length===0);
+ check(accountRemoved,'Real account action uses shared confirmation');
+ await page.locator('.feedback-confirm').click();await page.locator('.feedback-dialog').waitFor({state:'detached'});
+ for(const width of [320,390,768,1440]){
+  await page.setViewportSize({width,height:900});await start();
+  const box=await page.locator('.feedback-dialog').boundingBox();check(box.x>=0&&box.x+box.width<=width+1,'Confirmation fits '+width+'px');
+  await page.locator('.feedback-cancel').click();await cancelled();
+ }
+ await page.evaluate(async()=>{const host=document.createElement('section');host.id='mailbox-cancel-fixture';document.body.append(host);const {mountMailboxes}=await import('/src/mailboxes.js');mountMailboxes(host);});
+ await page.locator('#mailbox-cancel-fixture [data-mail-delete]').click();
+ await page.locator('.feedback-cancel').click();await page.locator('.feedback-dialog').waitFor({state:'detached'});
+ check(await page.locator('#mailbox-cancel-fixture [data-mail-dialog]').evaluate(node=>!node.open),'Cancel mailbox deletion does not open email editor');
+ await page.evaluate(()=>document.querySelector('#mailbox-cancel-fixture').remove());
+ await page.evaluate(async()=>{const {promptLink}=await import('/src/feedback.js');window.linkValue='pending';promptLink().then(value=>window.linkValue=value);});
+ await page.locator('.feedback-input').fill('javascript:alert(1)');await page.locator('.feedback-confirm').click();
+ check(await page.locator('.feedback-dialog').evaluate(node=>node.open),'Link dialog rejects non-HTTP URL');
+ await page.locator('.feedback-input').fill('https://example.com/');await page.locator('.feedback-confirm').click();
+ await page.locator('.feedback-dialog').waitFor({state:'detached'});
+ check(await page.evaluate(()=>window.linkValue)==='https://example.com/','Link prompt returns validated URL');
+ return {passed:checks.length,checks};
+}

@@ -1,3 +1,4 @@
+import {openDialog,closeDialog} from './dialog-motion.js';
 import {cloud} from './cloud.js';
 import {lineIcon} from './interface-icons.js';
 
@@ -18,8 +19,8 @@ export async function renderHonors(ctx){
   node.insertAdjacentHTML('beforeend','<dialog id="honors-editor" class="form-dialog school-dialog" aria-labelledby="honors-editor-title"><header><h2 id="honors-editor-title">編輯段考英雄榜</h2><button type="button" class="secondary-button" data-close>關閉</button></header><form id="honors-form"><label>英雄榜名稱<input name="title" maxlength="100" required></label><label>顯示名次<select name="top_count"><option value="1">只顯示第一名</option><option value="3">前三名</option><option value="5">前五名</option></select></label><div id="honors-places" class="honors-places"></div><p class="muted">每個名次須選擇不同的啟用中學生。姓名、暱稱與頭像會使用帳號目前的資料。</p><button type="submit" class="primary-button">公布英雄榜</button></form></dialog>');
   const dialog=node.querySelector('#honors-editor'),form=dialog.querySelector('form'),selected=new Map(data.winners.map(winner=>[winner.rank,winner.student_id]));form.elements.title.value=data.title;form.elements.top_count.value=String(data.top_count);
   const draw=()=>{node.querySelector('#honors-places').innerHTML=Array.from({length:Number(form.elements.top_count.value)},(_,index)=>`<label>第 ${index+1} 名<select name="place-${index+1}" data-honor-rank="${index+1}" required><option value="">請選擇學生</option>${data.candidates.map(student=>`<option value="${student.id}">${esc(personName(student))}</option>`).join('')}</select></label>`).join('');form.querySelectorAll('[data-honor-rank]').forEach(select=>{select.value=selected.get(Number(select.dataset.honorRank))||'';select.onchange=()=>selected.set(Number(select.dataset.honorRank),select.value);});};
-  form.elements.top_count.onchange=draw;draw();dialog.showModal();
-  form.onsubmit=ctx.safe(async event=>{event.preventDefault();const button=form.querySelector('[type="submit"]'),count=Number(form.elements.top_count.value),winners=Array.from({length:count},(_,index)=>form.elements['place-'+(index+1)].value);if(new Set(winners).size!==count)throw Error('每個名次請選擇不同的學生');button.disabled=true;try{await cloud.school('honors','PUT',{title:form.elements.title.value,top_count:count,winners});dialog.close();await renderHonors(ctx);notify('英雄榜已公布');}finally{button.disabled=false;}});
+  form.elements.top_count.onchange=draw;draw();openDialog(dialog);
+  form.onsubmit=ctx.safe(async event=>{event.preventDefault();const button=form.querySelector('[type="submit"]'),count=Number(form.elements.top_count.value),winners=Array.from({length:count},(_,index)=>form.elements['place-'+(index+1)].value);if(new Set(winners).size!==count)throw Error('每個名次請選擇不同的學生');button.disabled=true;try{await cloud.school('honors','PUT',{title:form.elements.title.value,top_count:count,winners});await closeDialog(dialog);await renderHonors(ctx);notify('英雄榜已公布');}finally{button.disabled=false;}});
   dialog.addEventListener('close',()=>dialog.remove(),{once:true});
  });
  if(!editable&&data.published){

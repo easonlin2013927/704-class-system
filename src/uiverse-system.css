@@ -194,29 +194,49 @@
   border-radius:12px!important;
   box-shadow:0 20px 64px #00000052!important;
 }
-/* Native close and submit retain control; older browsers keep immediate visibility. */
-@supports (transition-behavior:allow-discrete) {
-  [data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog) {
+/* Helpers preserve the native top layer until the exit transition finishes. */
+[data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog) {
+  opacity:0;
+  transform:translateY(10px) scale(.98);
+  transition:opacity 180ms ease,transform 180ms ease;
+}
+[data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog)[open] {
+  opacity:1;
+  transform:none;
+  animation:ui-dialog-enter 180ms ease-out;
+}
+[data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog)::backdrop {
+  opacity:0;
+  background:#0008;
+  backdrop-filter:blur(0px)!important;
+  -webkit-backdrop-filter:blur(0px)!important;
+  transition:opacity 180ms ease,backdrop-filter 180ms ease,-webkit-backdrop-filter 180ms ease;
+}
+[data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog)[open]::backdrop {
+  opacity:1;
+  backdrop-filter:blur(5px)!important;
+  -webkit-backdrop-filter:blur(5px)!important;
+}
+[data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog):is([data-dialog-opening],[data-dialog-closing]) {
+  opacity:0;
+  transform:translateY(10px) scale(.98);
+  animation:none;
+}
+[data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog)[data-dialog-closing] {pointer-events:none}
+[data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog):is([data-dialog-opening],[data-dialog-closing])::backdrop {
+  opacity:0;
+  backdrop-filter:blur(0px)!important;
+  -webkit-backdrop-filter:blur(0px)!important;
+}
+@keyframes ui-dialog-enter {
+  from {opacity:0;transform:translateY(10px) scale(.98)}
+  to {opacity:1;transform:none}
+}
+@starting-style {
+  [data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog)[open]::backdrop {
     opacity:0;
-    transform:translateY(8px) scale(.985);
-    animation:none;
-    transition:opacity 180ms ease,transform 180ms ease,display 180ms allow-discrete,overlay 180ms allow-discrete;
-  }
-  [data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog)[open] {
-    opacity:1;
-    transform:none;
-  }
-  [data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog)::backdrop {
-    opacity:0;
-    transition:opacity 180ms ease,display 180ms allow-discrete,overlay 180ms allow-discrete;
-  }
-  [data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog)[open]::backdrop {opacity:1}
-  @starting-style {
-    [data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog)[open] {
-      opacity:0;
-      transform:translateY(8px) scale(.985);
-    }
-    [data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog)[open]::backdrop {opacity:0}
+    backdrop-filter:blur(0px)!important;
+    -webkit-backdrop-filter:blur(0px)!important;
   }
 }
 [data-theme] :is(.form-dialog,.school-dialog)>header {
