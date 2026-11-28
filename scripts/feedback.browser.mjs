@@ -62,6 +62,23 @@ async page=>{
  await page.evaluate(()=>{document.querySelector('#test-parent').close();document.querySelector('#test-parent').remove();});
  await page.evaluate(async()=>{const {notify}=await import('/src/feedback.js');notify('已完成重要操作','success',{presentation:'dialog'});});
  check(await page.locator('.feedback-dialog[data-tone=success]').count()===1,'Important success supports confirmation');
+ const ring=await page.locator('.feedback-success-ring').evaluate(node=>{
+  const animation=node.getAnimations()[0];
+  if(!animation)return {};
+  animation.pause();animation.currentTime=150;
+  const first=getComputedStyle(node).transform;
+  const mark=node.parentElement;
+  const checkBefore=getComputedStyle(mark,'::before').transform;
+  animation.currentTime=350;
+  const result={rotates:first!==getComputedStyle(node).transform,checkFixed:checkBefore===getComputedStyle(mark,'::before').transform&&getComputedStyle(mark).transform==='none',iterations:animation.effect.getTiming().iterations};
+  animation.currentTime=800;
+  const style=getComputedStyle(node);
+  result.complete=style.borderTopColor===style.borderRightColor&&style.borderTopColor===style.borderBottomColor;
+  animation.play();return result;
+ });
+ check(ring.rotates,'Success ring rotates independently');
+ check(ring.checkFixed,'Success checkmark stays still');
+ check(ring.iterations===1&&ring.complete,'Success ring finishes once as a complete circle');
  for(const width of [320,390,768,1440]){
   await page.setViewportSize({width,height:900});
   const box=await page.locator('.feedback-dialog').boundingBox();
@@ -80,6 +97,10 @@ async page=>{
  }
  await page.evaluate(()=>document.documentElement.dataset.theme='dark');
  await page.emulateMedia({reducedMotion:'reduce'});
+ await page.evaluate(async()=>{const {notify}=await import('/src/feedback.js');notify('減少動畫成功測試','success',{presentation:'dialog'});});
+ check(await page.locator('.feedback-success-ring').evaluate(node=>node.getAnimations().length===0&&getComputedStyle(node).borderTopColor===getComputedStyle(node).borderRightColor),'Reduced motion keeps a static complete success ring');
+ await page.locator('.feedback-confirm').click();
+ await page.locator('.feedback-dialog').waitFor({state:'detached'});
  await page.evaluate(async()=>{const {notify}=await import('/src/feedback.js');notify('動畫偏好測試','error');});
  check(await page.locator('.feedback-dialog').evaluate(node=>getComputedStyle(node).animationName)==='none','Reduced motion disables entrance');
  await page.screenshot({path:'.taste-skill/uiverse-error.png'});

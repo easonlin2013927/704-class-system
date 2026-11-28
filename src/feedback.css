@@ -14,6 +14,9 @@
 .feedback-dialog[data-tone="danger"] .feedback-mark::after,.feedback-dialog[data-tone="warning"] .feedback-mark::after{width:3px;height:3px;left:25.5px;top:38px}
 .feedback-dialog[data-tone="success"] .feedback-mark::before{width:12px;height:2px;left:12px;top:29px;transform:rotate(45deg)}
 .feedback-dialog[data-tone="success"] .feedback-mark::after{width:24px;height:2px;left:19px;top:25px;transform:rotate(-45deg)}
+.feedback-dialog[data-tone="success"] .feedback-mark{border-color:transparent}
+.feedback-success-ring{position:absolute;inset:-1px;border:1px solid currentColor;border-radius:50%;animation:feedback-success-ring 800ms ease-out both}
+@keyframes feedback-success-ring{0%{transform:rotate(-90deg);border-right-color:transparent;border-bottom-color:transparent}75%{transform:rotate(270deg);border-right-color:transparent;border-bottom-color:transparent}100%{transform:rotate(270deg);border-color:currentColor}}
 .feedback-dialog .feedback-title{margin:0 0 12px;color:var(--feedback-ink);font-size:20px;font-weight:650;line-height:1.4;overflow-wrap:anywhere}
 .feedback-dialog .feedback-message{margin:0 0 26px;color:var(--feedback-ink);font-size:14px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
 .feedback-dialog .feedback-confirm{display:block;width:100%;min-height:44px;padding:10px 20px;border:1px solid var(--feedback-ink);border-radius:8px;background:var(--feedback-ink);color:var(--feedback-surface);font:inherit;font-size:14px;font-weight:650;cursor:pointer;box-shadow:none;transition:opacity 120ms ease}
@@ -35,4 +38,4 @@
 .feedback-region .feedback-dismiss:hover{border-color:var(--feedback-line)}
 @keyframes feedback-appear{from{opacity:0;translate:0 -5px}to{opacity:1;translate:0 0}}
 @media(max-width:380px){.feedback-dialog{padding:28px 20px 20px}.feedback-region .feedback-banner{gap:8px;padding-left:13px}}
-@media(prefers-reduced-motion:reduce){.feedback-dialog,.feedback-region .feedback-banner{animation:none}.feedback-dialog .feedback-confirm{transition:none}}
+@media(prefers-reduced-motion:reduce){.feedback-dialog,.feedback-region .feedback-banner,.feedback-success-ring{animation:none}.feedback-dialog .feedback-confirm{transition:none}}

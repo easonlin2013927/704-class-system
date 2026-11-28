@@ -34,6 +34,7 @@ function showDialog() {
  dialog.setAttribute('aria-describedby','feedback-dialog-message');
  const mark=element('span','feedback-mark');
  mark.setAttribute('aria-hidden','true');
+ if(item.tone==='success')mark.append(element('span','feedback-success-ring'));
  const title=element('h2','feedback-title',item.title||(item.tone==='error'?'操作未完成':'操作完成'));
  title.id='feedback-dialog-title';
  const message=element('p','feedback-message',item.message);
