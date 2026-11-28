@@ -1,4 +1,4 @@
-const APP_VERSION = '0.40.1';
+const APP_VERSION = '0.41.0';
 const CACHE_NAME = `704-class-system-${APP_VERSION}`;
 const APP_SHELL = [
   './',
@@ -6,8 +6,8 @@ const APP_SHELL = [
   './student/',
   './teacher/',
   './admin/',
-  './assets/app-0.40.1.css',
-  './assets/app-0.40.1.js',
+  './assets/app-0.41.0.css',
+  './assets/app-0.41.0.js',
   './src/logo.svg',
   './src/icon-192.png',
   './src/icon-512.png',
@@ -34,6 +34,13 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
+
+  const actionUrl=new URL(request.url);
+  // One-time email action pages must never fall back to the cached login shell.
+  if(actionUrl.origin===self.location.origin&&/\/auth-action(?:\/|$)/.test(actionUrl.pathname)){
+    event.respondWith(fetch(request,{cache:'no-store'}).catch(()=>new Response('請連上網際網路後，重新開啟郵件中的驗證或重設密碼連結。',{status:503,headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'}})));
+    return;
+  }
 
   if (request.mode === 'navigate') {
     const url = new URL(request.url);

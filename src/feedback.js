@@ -1,4 +1,5 @@
 import {openDialog,closeDialog} from './dialog-motion.js';
+import {motionRemove} from './ui-motion.js';
 const dialogs = [];
 const banners = [];
 const errors = new Set();
@@ -148,14 +149,14 @@ function showBanner() {
  const resume=reason=>{paused.delete(reason);start();};
  const visibility=()=>document.hidden?pause('hidden'):resume('hidden');
  const observer=new MutationObserver(attach);
- function dismiss() {
+ async function dismiss() {
   if(finished)return;
   finished=true;
   clearTimeout(timer);
   observer.disconnect();
   document.removeEventListener('visibilitychange',visibility);
   const focused=banner.contains(document.activeElement);
-  banner.remove();
+  await motionRemove(banner);
   activeBanner=undefined;
   dismissBanner=undefined;
   release(item);

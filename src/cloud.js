@@ -32,7 +32,7 @@ async function request(path, options = {}) {
   } catch { throw new Error("無法連接公告服務，請確認網路或聯絡管理員。"); }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    if(response.status===401&&!['/login','/auth/firebase','/public/auth-config'].includes(path)){token=null;window.dispatchEvent(new Event("session-expired"));}
+    if(response.status===401&&!path.startsWith('/auth/email/')&&!['/login','/auth/firebase','/public/auth-config'].includes(path)){token=null;window.dispatchEvent(new Event("session-expired"));}
     if(data.code==="PASSWORD_CHANGE_REQUIRED")window.dispatchEvent(new Event("password-required"));
     throw Object.assign(new Error(data.message || "雲端操作失敗，請稍後重試。"),{code:data.code,status:response.status});
   }
@@ -41,6 +41,7 @@ async function request(path, options = {}) {
   } catch(error) {if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:false,path,message:error.message}}));throw error;} finally { if(mutation)window.dispatchEvent(new Event('operation-end'));if(deleteKey)pendingDeletes.delete(deleteKey); }
 }
 export const cloud = {
+  emailAction(action,data){return request('/auth/email/'+action,{method:'POST',body:JSON.stringify(data),silent:true});},
   async loginData(profile,onAccess=()=>{}){
     const restricted=profile.must_change_password||profile.must_add_email||profile.must_change_email;
     const accessReady=cloud.school('permissions').catch(()=>null).then(access=>{onAccess(access);return access;});
@@ -79,7 +80,7 @@ export const cloud = {
     finally{window.dispatchEvent(new Event('operation-end'));}
   },
   attachments(post){return request('/school/attachments?post='+encodeURIComponent(post));},
-  async uploadAttachment(post,file,onProgress=()=>{}){if(file.size>400*1024*1024)throw new Error('單一公告附件不能超過 400 MB');const entry=await request('/school/attachments',{method:'POST',body:JSON.stringify({announcement_id:post,name:file.name,type:file.type||'application/octet-stream',size:file.size})});try{const chunkSize=4*1024*1024;for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){const part=file.slice(offset,Math.min(file.size,offset+chunkSize)),complete=offset+part.size>=file.size;const response=await fetch(config.url.replace(/\/$/,'')+'/school/attachments/'+entry.id+'?complete='+complete,{method:'PATCH',credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/octet-stream'},body:part});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||'公告附件上傳失敗');onProgress(file.size?Math.min(100,Math.round((offset+part.size)/file.size*100)):100);}}catch(e){await request('/school/attachments/'+entry.id,{method:'DELETE',silent:true}).catch(()=>{});throw e;}},
+  async uploadAttachment(post,file,onProgress=()=>{}){if(file.size>400*1024*1024)throw new Error('單一公告附件不能超過 400 MB');const entry=await request('/school/attachments',{method:'POST',body:JSON.stringify({announcement_id:post,name:file.name,type:file.type||'application/octet-stream',size:file.size})});try{const chunkSize=4*1024*1024;for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){const part=file.slice(offset,Math.min(file.size,offset+chunkSize)),complete=offset+part.size>=file.size;const response=await fetch(config.url.replace(/\/$/,'')+'/school/attachments/'+entry.id+'?complete='+complete,{method:'PATCH',credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/octet-stream'},body:part});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||'公告附件上傳失敗');onProgress(file.size?Math.min(100,Math.floor((offset+part.size)/file.size*100)):100);}}catch(e){await request('/school/attachments/'+entry.id,{method:'DELETE',silent:true}).catch(()=>{});throw e;}},
   downloadAttachment(id){const anchor=document.createElement('a');anchor.href=config.url.replace(/\/$/,'')+'/school/attachments/'+encodeURIComponent(id);anchor.rel='noopener';document.body.append(anchor);anchor.click();anchor.remove();},
   async uploadChatAttachment(messageId,file,onProgress=()=>{}){
     if(!(file instanceof File))throw new Error('請選擇要傳送的檔案');
@@ -92,7 +93,7 @@ export const cloud = {
         const complete=offset+part.size>=file.size;
         const response=await fetch(config.url.replace(/\/$/,'')+'/school/chat-attachments/'+entry.id+'?complete='+complete,{method:'PATCH',credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/octet-stream'},body:part});
         const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||'檔案上傳失敗');
-        onProgress(file.size?Math.min(100,Math.round((offset+part.size)/file.size*100)):100);
+        onProgress(file.size?Math.min(100,Math.floor((offset+part.size)/file.size*100)):100);
       }
       return entry;
     }catch(error){
@@ -100,19 +101,26 @@ export const cloud = {
       throw error;
     }
   },
-  async downloadChatAttachment(id){
+  async downloadChatAttachment(id,onProgress=()=>{}){
     const response=await fetch(config.url.replace(/\/$/,'')+'/school/chat-attachments/'+encodeURIComponent(id),{credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{})},cache:'no-store'});
     if(!response.ok){const result=await response.json().catch(()=>({}));throw Error(result.message||'聊天附件下載失敗');}
     let blob,name;
+    onProgress(null);
     if(response.headers.get('Content-Type')?.includes('application/json')&&!response.headers.get('Content-Disposition')?.includes('attachment')){const file=await response.json();name=file.name;const data=Uint8Array.from(atob(file.data),c=>c.charCodeAt(0));blob=new Blob([data],{type:file.type||'application/octet-stream'});}
-    else{blob=await response.blob();const disposition=response.headers.get('Content-Disposition')||'',match=disposition.match(/filename\*=UTF-8''([^;]+)/i);try{name=match?decodeURIComponent(match[1]):'聊天附件';}catch{name='聊天附件';}}
+    else{
+      const length=response.headers.get('Content-Encoding')?0:Number(response.headers.get('Content-Length')),reader=response.body?.getReader();
+      if(reader){const chunks=[];let received=0;try{while(true){const {value,done}=await reader.read();if(done)break;chunks.push(value);received+=value.byteLength;if(length>0)onProgress(Math.min(100,received/length*100));}}finally{reader.releaseLock();}blob=new Blob(chunks,{type:response.headers.get('Content-Type')||'application/octet-stream'});}
+      else blob=await response.blob();
+      const disposition=response.headers.get('Content-Disposition')||'',match=disposition.match(/filename\*=UTF-8''([^;]+)/i);try{name=match?decodeURIComponent(match[1]):'聊天附件';}catch{name='聊天附件';}
+    }
+    onProgress(100);
     const url=URL.createObjectURL(blob),anchor=document.createElement('a');anchor.href=url;anchor.download=name||'聊天附件';document.body.append(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   },
   async uploadProfileFile(kind,file,onProgress=()=>{}){
     if(!['avatar','wallpaper'].includes(kind)||!(file instanceof File))throw new Error('圖片上傳格式錯誤');
     if(file.size>400*1024*1024)throw new Error('圖片檔案不能超過 400 MB');
     const entry=await request('/school/profile-files',{method:'POST',body:JSON.stringify({kind,type:file.type,size:file.size})}),chunkSize=4*1024*1024;
-    for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){const part=file.slice(offset,Math.min(file.size,offset+chunkSize)),complete=offset+part.size>=file.size,response=await fetch(config.url.replace(/\/$/,'')+'/school/profile-files/'+entry.id+'?complete='+complete,{method:'PATCH',credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/octet-stream'},body:part}),result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||'圖片上傳失敗');onProgress(file.size?Math.min(100,Math.round((offset+part.size)/file.size*100)):100);if(complete)return result.url;}
+    for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){const part=file.slice(offset,Math.min(file.size,offset+chunkSize)),complete=offset+part.size>=file.size,response=await fetch(config.url.replace(/\/$/,'')+'/school/profile-files/'+entry.id+'?complete='+complete,{method:'PATCH',credentials:'include',headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/octet-stream'},body:part}),result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||'圖片上傳失敗');onProgress(file.size?Math.min(100,Math.floor((offset+part.size)/file.size*100)):100);if(complete)return result.url;}
   },
   async login(email, password, portal, remember=false) {
     token = null;

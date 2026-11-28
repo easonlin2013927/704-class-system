@@ -1,4 +1,5 @@
 async page=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});
  const checks=[];
  const check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
  const actor={id:'10000000-0000-4000-8000-000000000001',role:'admin',display_name:'Preview Admin',theme:'dark',permissions:{accounts:true,site_settings:true}};
@@ -37,7 +38,8 @@ async page=>{
   notify('操作完成');notify('活動已儲存');
  });
  check(await page.locator('.feedback-banner').count()===1,'Success notices replace outdated success');
- check((await page.locator('.feedback-banner').textContent()).includes('活動已儲存'),'Latest success is immediate');
+ await page.locator('.feedback-banner').filter({hasText:'活動已儲存'}).waitFor();
+ check((await page.locator('.feedback-banner').textContent()).includes('活動已儲存'),'Latest success replaces the old notice after its exit');
  await page.locator('.feedback-dismiss').click();
  await page.evaluate(async()=>{
   const {notify}=await import('/src/feedback.js');

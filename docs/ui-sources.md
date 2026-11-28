@@ -15,3 +15,5 @@
 後續動態補強亦由本專案自行撰寫：CSS 環形載入、按鈕高光與按壓深度、輸入框焦點內光。GitHub 專案按鈕重用既有 `github-logo.svg`。畫面切換使用 Web Animations API 的 180ms 淡入，依畫面識別碼決定是否播放。
 
 對話框透過共用 `openDialog`／`closeDialog` 控制 180ms 進退場，背景模糊由 0px 轉換到 5px；Escape 與 dialog 表單提交也保留退場動畫。刪除確認、成功圓圈勾勾及新增連結輸入窗沿用共用提示框，不依賴瀏覽器原生 confirm／prompt。這些元件延續 [Uiverse](https://uiverse.io/) 的短動畫、細邊線與狀態回饋方向，程式碼由本專案自行撰寫。
+
+全站補強參考 Uiverse 的 [Buttons](https://uiverse.io/buttons)、[Inputs](https://uiverse.io/inputs)、[Checkboxes](https://uiverse.io/checkboxes)、[Switches](https://uiverse.io/switches)、[Cards](https://uiverse.io/cards)、[Loading UI](https://uiverse.io/ui/loading-ui) 與 [Tooltips](https://uiverse.io/ui/tooltip-ui) 分類，自行實作 `src/ui-motion.js` 與 `src/feature-motion.js`。前者負責共用進退場、忙碌狀態與控制項，後者負責依資料識別碼保留留言／聊天項目與功能動畫。原生日期、下拉選單與勾選形狀保留；僅為其周邊焦點與狀態增加動態，不使用假的進度、假已讀或尚未完成的成功回饋。

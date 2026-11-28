@@ -1,5 +1,9 @@
 /* Original 704 component styles; visual research and sources: docs/ui-sources.md.
    Loaded after the existing themes. Keep native controls and application markup. */
+.password-field{display:block;position:relative;width:100%}
+.password-field input{width:100%;padding-right:64px!important}
+[data-theme] .password-field .password-visibility{position:absolute;right:6px;top:50%;translate:0 -50%;width:auto;min-height:32px;padding:4px 8px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--ink);font:inherit;font-size:12px;cursor:pointer;box-shadow:none}
+[data-theme] .password-field .password-visibility:hover{border-color:var(--line-strong)}
 [data-theme] {
   --ui-edge:var(--line-strong,var(--line));
   --ui-shadow:0 2px 0 #00000066,0 3px 7px #00000024,inset 0 1px 0 color-mix(in srgb,var(--ink) 14%,transparent);
@@ -187,6 +191,45 @@
   animation:ui-ring-spin 800ms linear infinite;
 }
 @keyframes ui-ring-spin {to{transform:rotate(360deg)}}
+
+/* State-driven affordances use the existing theme palette. */
+[data-theme] :is(.repo-button::before,.back-button svg,.danger-button svg,.google-auth-button svg,.provider-button svg,.password-toggle svg,.nav-more>summary::after) {transition:transform 160ms ease,opacity 160ms ease}
+[data-theme] .nav-more>summary::after {transform-origin:center}
+[data-theme] .nav-more[open]>summary::after {transform:rotate(45deg)}
+[data-theme] .school-nav button[aria-current="page"] {border-inline-start-color:var(--accent)!important}
+[data-theme] :is(.settings-tabs,.studio-tabs,.filter-tabs) button {position:relative}
+[data-theme] :is(.settings-tabs,.studio-tabs) button::after {content:"";position:absolute;inset:auto 12px 3px;height:2px;background:var(--accent);transform:scaleX(0);transition:transform 160ms ease;pointer-events:none}
+[data-theme] :is(.settings-tabs,.studio-tabs) button[aria-selected="true"]::after {transform:scaleX(1)}
+[data-theme] .password-toggle[aria-pressed="true"] svg {transform:scale(.88)}
+[data-theme] :is(.search-box,[data-motion-search])[aria-busy="true"]::after,
+[data-theme] button[data-motion-busy]::after {content:"";display:inline-block;flex:none;vertical-align:middle;width:12px;height:12px;margin-inline-start:8px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:ui-ring-spin 800ms linear infinite}
+[data-theme] button[data-motion-busy] {cursor:progress!important;opacity:.75}
+[data-theme] [data-tooltip] {position:relative}
+[data-theme] [data-tooltip]::after {content:attr(data-tooltip);position:absolute;z-index:20;bottom:calc(100% + 8px);left:50%;width:max-content;max-width:min(240px,75vw);padding:7px 10px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink);box-shadow:0 4px 16px #0003;font:12px/1.5 inherit;white-space:normal;pointer-events:none;opacity:0;translate:-50% 3px;visibility:hidden;transition:opacity 120ms ease,translate 120ms ease,visibility 120ms ease}
+[data-theme] [data-tooltip]:focus-visible::after {opacity:1;translate:-50% 0;visibility:visible}
+[data-theme] progress {accent-color:var(--accent)}
+[data-theme] progress::-webkit-progress-value {transition:width 180ms ease}
+[data-theme] progress::-moz-progress-bar {transition:width 180ms ease}
+[data-theme] [data-motion-progress] {transition:width 180ms ease,scale 180ms ease}
+[data-theme] [data-motion="value"],[data-countdown-at] {font-variant-numeric:tabular-nums}
+[data-theme] [data-motion-skeleton][aria-busy="true"] {background:linear-gradient(100deg,var(--surface-2) 25%,var(--control) 45%,var(--surface-2) 65%);background-size:220% 100%;animation:ui-skeleton 1400ms ease-in-out infinite}
+@keyframes ui-skeleton {to{background-position:-220% 0}}
+@supports(field-sizing:content) {[data-theme] textarea[data-autoheight] {field-sizing:content;min-height:6lh;max-height:50dvh}}
+@media(hover:hover) and (pointer:fine) {
+ [data-theme] [data-tooltip]:hover::after {opacity:1;translate:-50% 0;visibility:visible}
+ [data-theme] .repo-button:hover::before {transform:rotate(-8deg) scale(1.08)}
+ [data-theme] .back-button:hover svg {transform:translateX(-3px)}
+ [data-theme] .danger-button:hover svg {transform:rotate(-8deg)}
+ [data-theme] :is(.google-auth-button,.provider-button):hover svg {transform:translateY(-2px)}
+ [data-theme] .theme-card:hover .theme-preview {filter:brightness(1.04)}
+}
+@media(prefers-reduced-motion:reduce) {
+ [data-theme] :is(.repo-button::before,.back-button svg,.danger-button svg,.google-auth-button svg,.provider-button svg,.password-toggle svg,.nav-more>summary::after,.settings-tabs button::after,.studio-tabs button::after,[data-tooltip]::after,progress,[data-motion-progress]) {transition:none!important}
+ [data-theme] :is(.repo-button:hover::before,.back-button:hover svg,.danger-button:hover svg,.google-auth-button:hover svg,.provider-button:hover svg) {transform:none!important}
+ [data-theme] :is(.search-box,[data-motion-search])[aria-busy="true"]::after,[data-theme] button[data-motion-busy]::after,[data-theme] [data-motion-skeleton][aria-busy="true"] {animation:none!important}
+ [data-theme] progress::-webkit-progress-value {transition:none!important}
+ [data-theme] progress::-moz-progress-bar {transition:none!important}
+}
 
 /* Dialog layout and scroll behavior remain owned by the existing form styles. */
 [data-theme] :is(.form-dialog,.school-dialog,.feedback-dialog) {

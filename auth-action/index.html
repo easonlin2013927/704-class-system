@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <meta name="referrer" content="no-referrer">
+ <meta name="robots" content="noindex,nofollow">
+ <title>帳號驗證與重設密碼｜704班級系統</title>
+ <link rel="icon" href="../src/logo.svg" type="image/svg+xml">
+ <link rel="stylesheet" href="../src/auth-action.css">
+ <link rel="stylesheet" href="../src/uiverse-system.css">
+ <link rel="stylesheet" href="../src/feedback.css">
+</head>
+<body>
+ <main class="action-shell"><section class="action-card" aria-labelledby="action-title">
+  <img src="../src/logo.svg" width="56" height="56" alt="704班級系統">
+  <p>704班級系統</p><h1 id="action-title">正在確認連結</h1>
+  <p id="action-description"></p>
+  <form id="action-form" hidden>
+   <div id="password-fields" hidden>
+    <label>新密碼<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="256"></label>
+    <label>確認新密碼<input name="confirmation" type="password" autocomplete="new-password" minlength="8" maxlength="256"></label>
+   </div>
+   <button type="submit" class="primary-button" id="action-submit">確認驗證</button>
+  </form>
+  <p id="action-status" role="status" aria-live="polite"></p>
+  <nav aria-label="返回登入"><a href="../student/">學生登入</a><a href="../teacher/">教師登入</a><a href="../admin/">管理員登入</a></nav>
+ </section></main>
+ <script type="module" src="../src/auth-action.js"></script>
+</body>
+</html>

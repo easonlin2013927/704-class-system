@@ -1,6 +1,7 @@
 import {openDialog,closeDialog} from './dialog-motion.js';
 import {cloud} from './cloud.js';
 import {lineIcon} from './interface-icons.js';
+import {featureMotion} from './feature-motion.js';
 
 const api=(path,method='GET',body)=>cloud.school(path,method,body);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -11,6 +12,7 @@ export async function renderBoard(ctx){
  const {node,user,notify,navigate}=ctx,mayReply=user.role==='admin'||user.permissions?.board_reply;
  node.innerHTML=`<section class="cork-scene" aria-labelledby="board-title"><header class="cork-toolbar"><button type="button" id="board-back" class="cork-control">${lineIcon('back',18)}<span>返回</span></button><div><h1 id="board-title">班級留言板</h1><p>留一張今天的心情</p></div><button type="button" id="board-add" class="cork-control cork-primary">${lineIcon('plus',18)}<span>新增便利貼</span></button></header><p class="cork-instructions">全班公開 · 拖動自己便利貼的移動鈕；也可聚焦移動鈕後使用方向鍵。左右、上下捲動查看牆面。</p><div class="cork-viewport" tabindex="0" aria-label="可捲動的軟木留言牆"><div class="cork-board"><div id="cork-stage" class="cork-stage"><p class="cork-empty" role="status">正在讀取便利貼…</p></div><button type="button" id="board-more" class="cork-control" hidden>載入更早的便利貼</button></div></div><p class="board-live" id="board-live" role="status" aria-live="polite"></p></section>`;
  const stage=node.querySelector('#cork-stage'),viewport=node.querySelector('.cork-viewport'),live=node.querySelector('#board-live'),more=node.querySelector('#board-more');
+ stage.dataset.featureMotion='board';
  let posts=new Map(),pages=1,drag=null,refreshing=false;const saving=new Set();
  const size=paper=>({x:Math.max(1,stage.clientWidth-paper.offsetWidth),y:Math.max(1,stage.clientHeight-paper.offsetHeight)});
  const place=(paper,x,y)=>{const available=size(paper);paper.style.left=`${clamp(x)*available.x}px`;paper.style.top=`${clamp(y)*available.y}px`;};
@@ -29,9 +31,12 @@ export async function renderBoard(ctx){
  const details=post=>{
   const dialog=showDialog(post.author_name+'的便利貼',`<time>${esc(stamp(post.created_at))}</time><p class="classroom-text">${esc(post.content)}</p><section class="board-replies" aria-label="公開回覆">${(post.replies||[]).map(reply=>`<article><header><strong>${esc(reply.author_name)}</strong><time>${esc(stamp(reply.created_at))}</time></header><p class="classroom-text">${esc(reply.content)}</p></article>`).join('')||'<p class="muted">尚無回覆</p>'}</section>${mayReply?'<form id="board-reply-form"><label>公開回覆<textarea name="content" rows="3" maxlength="2000" required></textarea></label><button type="submit" class="secondary-button">公開回覆</button></form>':''}${post.author_id===user.id||user.role==='admin'||user.permissions?.board_manage===true?'<button type="button" class="danger-button" data-delete-note>刪除便利貼</button>':''}`);
   const form=dialog.querySelector('form');
-  if(form)form.onsubmit=ctx.safe(async event=>{event.preventDefault();const button=form.querySelector('[type="submit"]');button.disabled=true;try{await api('board/'+post.id+'/replies','POST',{content:new FormData(form).get('content')});await closeDialog(dialog);await refresh();notify('回覆已公開');}finally{button.disabled=false;}});
+  const replies=dialog.querySelector('.board-replies');replies.dataset.featureMotion='replies';
+  featureMotion(replies,[{opacity:0,clipPath:'inset(0 0 100% 0)'},{opacity:1,clipPath:'inset(0)'}],{duration:260});
+  replies.querySelectorAll('article').forEach((article,index)=>featureMotion(article,[{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{delay:Math.min(index,8)*35,fill:'backwards'}));
+  if(form)form.onsubmit=ctx.safe(async event=>{event.preventDefault();const button=form.querySelector('[type="submit"]');button.disabled=true;try{const reply=await api('board/'+post.id+'/replies','POST',{content:new FormData(form).get('content')});post.replies=[...(post.replies||[]),reply];replies.querySelector('.muted')?.remove();replies.insertAdjacentHTML('beforeend',`<article><header><strong>${esc(reply.author_name)}</strong><time>${esc(stamp(reply.created_at))}</time></header><p class="classroom-text">${esc(reply.content)}</p></article>`);const article=replies.lastElementChild;featureMotion(article,[{opacity:0,transform:'translateY(12px)'},{opacity:1,transform:'none'}]);form.reset();notify('回覆已公開');}finally{button.disabled=false;}});
   const remove=dialog.querySelector('[data-delete-note]');
-  if(remove)remove.onclick=ctx.safe(async()=>{remove.disabled=true;try{await api('board/'+post.id,'DELETE');await closeDialog(dialog);await refresh();}finally{remove.disabled=false;}});
+  if(remove)remove.onclick=ctx.safe(async()=>{remove.disabled=true;try{await api('board/'+post.id,'DELETE');await closeDialog(dialog);const paper=[...stage.querySelectorAll('[data-note-id]')].find(item=>item.dataset.noteId===post.id);await featureMotion(paper,[{opacity:1,transform:paper?getComputedStyle(paper).transform:'none'},{opacity:0,transform:'scale(.82) rotate(-3deg)'}],{duration:200});paper?.remove();posts.delete(post.id);await refresh();}finally{remove.disabled=false;}});
  };
  const bindMove=(paper,post)=>{
   const handle=paper.querySelector('[data-note-move]');if(!handle)return;
@@ -54,7 +59,7 @@ export async function renderBoard(ctx){
    const moved=drag.moved;drag=null;paper.classList.remove('is-dragging');
    if(handle.hasPointerCapture(event.pointerId))handle.releasePointerCapture(event.pointerId);
    if(cancelled){place(paper,post.position_x,post.position_y);return;}
-   if(moved){const available=size(paper);save(paper,post,parseFloat(paper.style.left)/available.x,parseFloat(paper.style.top)/available.y);}
+   if(moved){featureMotion(paper,[{transform:'rotate(2deg) scale(1.035)'},{transform:'rotate(-1deg) scale(.99)',offset:.65},{transform:`rotate(${paper.style.getPropertyValue('--paper-angle')}) scale(1)`}],{duration:300});const available=size(paper);save(paper,post,parseFloat(paper.style.left)/available.x,parseFloat(paper.style.top)/available.y);}
    else live.textContent='使用方向鍵微調位置，或拖動移動鈕';
   };
   handle.addEventListener('pointerup',event=>finish(event));handle.addEventListener('pointercancel',event=>finish(event,true));
@@ -66,16 +71,26 @@ export async function renderBoard(ctx){
   });
   handle.addEventListener('keyup',event=>{if(!event.key.startsWith('Arrow')||drag||saving.has(post.id))return;event.preventDefault();const available=size(paper);save(paper,post,parseFloat(paper.style.left)/available.x,parseFloat(paper.style.top)/available.y);});
  };
- const draw=rows=>{
-  posts=new Map(rows.map((post,index)=>[post.id,{...post,position_x:Number.isFinite(post.position_x)?post.position_x:(index%5)*.2,position_y:Number.isFinite(post.position_y)?post.position_y:Math.floor(index/5)*.15}]));
-  stage.innerHTML=rows.length?[...posts.values()].reverse().map(post=>{const seed=[...post.id].reduce((sum,c)=>sum+c.charCodeAt(0),0);return `<article class="sticky-note paper-${seed%4}" data-note-id="${post.id}" style="--paper-angle:${(seed%5-2)*.6}deg"><button type="button" class="note-open" data-open-note="${post.id}" aria-label="閱讀${esc(post.author_name)}的便利貼"><strong>${esc(post.author_name)}</strong><p>${esc(post.content.slice(0,180))}${post.content.length>180?'…':''}</p><small>${(post.replies||[]).length?`${post.replies.length} 則回覆`:'點開閱讀'}${post.author_id===user.id?' · 我的便利貼':''}</small></button>${post.author_id===user.id?`<button type="button" class="note-move" data-note-move aria-label="移動我的便利貼，使用方向鍵或拖動">${lineIcon('move',16)}</button>`:''}</article>`;}).join(''):'<div class="cork-empty"><h2>今天，想留下什麼？</h2><p>點右上角新增一張便利貼。</p></div>';
-  stage.querySelectorAll('[data-note-id]').forEach(paper=>{const post=posts.get(paper.dataset.noteId);place(paper,post.position_x,post.position_y);paper.querySelector('[data-open-note]').onclick=()=>details(post);bindMove(paper,post);});
+ const draw=async rows=>{
+  posts=new Map(rows.map((post,index)=>{const current=posts.get(post.id)||{};return [post.id,Object.assign(current,post,{position_x:Number.isFinite(post.position_x)?post.position_x:(index%5)*.2,position_y:Number.isFinite(post.position_y)?post.position_y:Math.floor(index/5)*.15})];}));
+  await Promise.all([...stage.querySelectorAll('[data-note-id]')].filter(paper=>!posts.has(paper.dataset.noteId)).map(async paper=>{await featureMotion(paper,[{opacity:1},{opacity:0,transform:'scale(.85)'}]);paper.remove();}));
+  stage.querySelector('.cork-empty')?.remove();
+  const existing=new Map([...stage.querySelectorAll('[data-note-id]')].map(paper=>[paper.dataset.noteId,paper]));
+  [...posts.values()].reverse().forEach(post=>{
+   let paper=existing.get(post.id),fresh=!paper;
+   if(fresh){const seed=[...post.id].reduce((sum,c)=>sum+c.charCodeAt(0),0);stage.insertAdjacentHTML('beforeend',`<article class="sticky-note paper-${seed%4}" data-note-id="${esc(post.id)}" style="--paper-angle:${(seed%5-2)*.6}deg"><button type="button" class="note-open" data-open-note="${esc(post.id)}" aria-label="閱讀${esc(post.author_name)}的便利貼"></button>${post.author_id===user.id?`<button type="button" class="note-move" data-note-move aria-label="移動我的便利貼，使用方向鍵或拖動">${lineIcon('move',16)}</button>`:''}</article>`);paper=stage.lastElementChild;paper.querySelector('[data-open-note]').onclick=()=>details(post);bindMove(paper,post);}
+   const open=paper.querySelector('.note-open'),content=`<strong>${esc(post.author_name)}</strong><p>${esc(post.content.slice(0,180))}${post.content.length>180?'…':''}</p><small>${(post.replies||[]).length?`${post.replies.length} 則回覆`:'點開閱讀'}${post.author_id===user.id?' · 我的便利貼':''}</small>`;
+   if(open.innerHTML!==content)open.innerHTML=content;
+   place(paper,post.position_x,post.position_y);
+   if(fresh)featureMotion(paper,[{opacity:0,transform:'translateY(-22px) rotate(-4deg) scale(1.06)'},{opacity:1,transform:`rotate(${paper.style.getPropertyValue('--paper-angle')}) scale(1)`}],{duration:360});
+  });
+  if(!rows.length)stage.innerHTML='<div class="cork-empty"><h2>今天，想留下什麼？</h2><p>點右上角新增一張便利貼。</p></div>';
  };
  async function refresh(){
   if(refreshing||drag||saving.size||!node.isConnected)return;refreshing=true;
   try{let rows=[],before='',batch=[];for(let index=0;index<pages;index++){batch=await api('board'+(before?'?before='+encodeURIComponent(before):''));rows.push(...batch);before=batch.at(-1)?.id;if(batch.length<50)break;}
    if(!node.isConnected||drag||saving.size||node.querySelector('dialog[open]'))return;
-   draw(rows);more.hidden=batch.length<50;
+   await draw(rows);more.hidden=batch.length<50;
   }finally{refreshing=false;}
  }
  node.querySelector('#board-back').onclick=()=>navigate('home');

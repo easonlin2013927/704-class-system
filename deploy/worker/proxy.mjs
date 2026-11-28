@@ -3,7 +3,7 @@ const ORIGIN='https://easonlin2013927.github.io';
 const MAX_BODY=4*1024*1024;
 const METHODS=['GET','POST','PUT','PATCH','DELETE','OPTIONS'];
 const ID='[0-9a-fA-F-]{36}';
-const paths=new RegExp(`^(?:/(?:health|login|logout|me)|/account/(?:password|providers(?:/(?:google|github|microsoft))?)|/auth/firebase|/public/(?:banner|auth-config)|/settings/(?:banner|marquee)|/admin/(?:accounts(?:/${ID})?|status)|/(?:announcements|countdowns)(?:/${ID}(?:/comments(?:/${ID})?)?)?|/school/[a-z-]+(?:/${ID}(?:/(?:check|messages|members|leave|report|download|replies|remind))?)?)$`);
+const paths=new RegExp(`^(?:/(?:health|login|logout|me)|/account/(?:password|providers(?:/(?:google|github|microsoft))?)|/auth/firebase|/auth/email/(?:verify-confirm|password-reset/(?:request|confirm))|/public/(?:banner|auth-config)|/settings/(?:banner|marquee)|/admin/(?:accounts(?:/${ID})?|status)|/(?:announcements|countdowns)(?:/${ID}(?:/comments(?:/${ID})?)?)?|/school/[a-z-]+(?:/${ID}(?:/(?:check|messages|members|leave|report|download|replies|remind))?)?)$`);
 function responseHeaders(origin){const h=new Headers({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Vary':'Origin','Content-Type':'application/json; charset=utf-8'});if(origin===ORIGIN){h.set('Access-Control-Allow-Origin',ORIGIN);h.set('Access-Control-Allow-Credentials','true');h.set('Access-Control-Allow-Methods',METHODS.join(', '));h.set('Access-Control-Allow-Headers','Content-Type, Authorization');h.set('Access-Control-Expose-Headers','Content-Disposition, Content-Length');h.set('Access-Control-Max-Age','600');}return h;}
 function error(status,message,headers){return new Response(JSON.stringify({message}),{status,headers});}
 async function readBody(request){

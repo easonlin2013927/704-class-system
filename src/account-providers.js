@@ -23,7 +23,7 @@ export function mountAccountProviders(host,onSignOut){
   providers=data.providers.filter(provider=>Object.hasOwn(loginProviders,provider.id)).map(provider=>({...provider,name:loginProviders[provider.id].name}));
   for(const [id,{name}] of Object.entries(loginProviders)){
    const provider=providers.find(item=>item.id===id),card=host.querySelector(`[data-provider-card="${id}"]`),action=card.querySelector('[data-provider-action]');
-   card.querySelector('[data-provider-state]').textContent=provider?.linked?'已綁定：'+(provider.linked.email||`${name} 帳戶（未提供信箱）`):provider?.enabled?'尚未綁定':'服務尚未啟用，請聯絡管理員。';
+   const label=card.querySelector('[data-provider-state]');label.dataset.motion='value';label.textContent=provider?.linked?'已綁定：'+(provider.linked.email||`${name} 帳戶（未提供信箱）`):provider?.enabled?'尚未綁定':'服務尚未啟用，請聯絡管理員。';
    action.textContent=provider?.linked?'解除綁定':`綁定 ${name}`;action.disabled=!provider?.linked;
   }
   if(!providers.some(provider=>provider.enabled&&!provider.linked))return;

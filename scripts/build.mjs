@@ -39,6 +39,8 @@ await build({
   outfile: resolve(`dist/assets/${assetBase}.js`),
 });
 
+await build({entryPoints:[resolve('src/auth-action.js')],bundle:true,format:'esm',minify:true,target:['es2022'],legalComments:'none',outfile:resolve(`dist/assets/auth-action-${version}.js`)});
+
 await build({
   stdin: {
     contents: styles.map(file => `@import "./src/${file}";`).join("\n"),
@@ -76,6 +78,8 @@ await writeFile("dist/index.html", html);
 await cp("service-worker.js", "dist/service-worker.js");
 await cp("src", "dist/src", { recursive: true });
 for(const page of ['about','privacy','terms'])await cp(page,`dist/${page}`,{recursive:true});
+await mkdir('dist/auth-action',{recursive:true});
+await writeFile('dist/auth-action/index.html',(await readFile('auth-action/index.html','utf8')).replace('../src/auth-action.js',`../assets/auth-action-${version}.js`));
 await cp("docs/presentations/704-class-system-role-guide.pptx", "dist/downloads/704-class-system-role-guide.pptx");
 
 const portals = {
