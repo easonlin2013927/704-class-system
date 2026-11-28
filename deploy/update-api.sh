@@ -2,23 +2,10 @@
 set -euo pipefail
 ROOT=/data/704-class-system
 ENV_FILE="$HOME/.config/704-api/mail-0194.env"
-IMAGE=announcement704/704-api:0.41.0
-TEST=api704-v0410-test
-FIREBASE_KEY_FILE="$HOME/.config/704-api/firebase-service-account.json"
+IMAGE=announcement704/704-api:0.41.1
+TEST=api704-v0411-test
 test -f "$ENV_FILE"
 test -d "$ROOT/uploads"
-if ! test -r "$FIREBASE_KEY_FILE"; then
-  echo 'DEPLOY_BLOCKED: 請先依 docs/firebase-email.md 放置 Firebase 服務帳戶檔案'
-  exit 1
-fi
-chmod 600 "$FIREBASE_KEY_FILE"
-if [ "$(stat -c %u "$FIREBASE_KEY_FILE")" != 1000 ]; then
-  echo 'DEPLOY_BLOCKED: Firebase 檔案需由容器 UID 1000 讀取，請依 docs/firebase-email.md 調整擁有者'
-  exit 1
-fi
-if ! grep -q '^GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-service-account.json$' "$ENV_FILE"; then
-  printf '\nGOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-service-account.json\n' >> "$ENV_FILE"
-fi
 if ! grep -q '^FIREBASE_API_KEY=.' "$ENV_FILE"; then
   # Migrate the existing public Web key without printing it or copying other environment values.
   printf '\n' >> "$ENV_FILE"
@@ -34,7 +21,7 @@ git -C "$ROOT/source" pull --ff-only origin main
 docker build -t "$IMAGE" "$ROOT/source/server"
 docker create --name "$TEST" --network 1panel-network --restart no \
   -p 127.0.0.1:7041:7040 --env-file "$ENV_FILE" \
-  -v "$ROOT/uploads:/data/chat-files" -v "$FIREBASE_KEY_FILE:/run/secrets/firebase-service-account.json:ro" "$IMAGE"
+  -v "$ROOT/uploads:/data/chat-files" "$IMAGE"
 trap 'docker rm -f "$TEST" >/dev/null 2>&1 || true' EXIT
 docker start "$TEST"
 ready() {
@@ -72,17 +59,9 @@ today_ready() {
 }
 ready 7041
 today_ready "$TEST"
-firebase_email_ready() {
-  docker exec "$1" node --input-type=module -e '
-    import { createFirebaseEmailRemote } from "./firebase-email.mjs";
-    try { await createFirebaseEmailRemote().configured(); }
-    catch { console.error("FIREBASE_EMAIL_CONFIG_INVALID"); process.exit(1); }
-  '
-}
-firebase_email_ready "$TEST"
 docker exec "$TEST" sh -c 'test -w /data/chat-files'
 docker rm -f "$TEST"
-BACKUP="api704-pre-v0410-$(date +%Y%m%d-%H%M%S)"
+BACKUP="api704-pre-v0411-$(date +%Y%m%d-%H%M%S)"
 docker stop api704
 docker rename api704 "$BACKUP"
 rollback() {
@@ -93,8 +72,8 @@ rollback() {
 }
 if docker create --name api704 --network 1panel-network --restart unless-stopped \
   -p 127.0.0.1:7040:7040 --env-file "$ENV_FILE" \
-  -v "$ROOT/uploads:/data/chat-files" -v "$FIREBASE_KEY_FILE:/run/secrets/firebase-service-account.json:ro" "$IMAGE" && docker start api704 && ready 7040 && today_ready api704 && firebase_email_ready api704; then
-  echo "DEPLOY_OK v0.41.0; BACKUP=$BACKUP"
+  -v "$ROOT/uploads:/data/chat-files" "$IMAGE" && docker start api704 && ready 7040 && today_ready api704; then
+  echo "DEPLOY_OK v0.41.1; BACKUP=$BACKUP"
 else
   rollback
   exit 1

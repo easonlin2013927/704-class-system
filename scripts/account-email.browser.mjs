@@ -12,8 +12,8 @@ async page=>{
   if(path==='/public/auth-config')body={firebase:{enabled:false}};
   if(path==='/public/banner')body={enabled:false,content:'',marqueeEnabled:false,marquee:''};
   if(path==='/school/mailboxes')body=[{id,address:'fixture@example.test',verified,locked:false}];
-  if(path==='/school/mailbox-request')body={ok:true,delivery:'firebase'};
-  if(path.startsWith('/auth/email/')){requests.push({path,body:route.request().postDataJSON()});body={ok:true,delivery:'firebase'};if(fail){status=400;body={message:'連結無效或已過期'};}}
+  if(path==='/school/mailbox-request')body={ok:true,delivery:'email'};
+  if(path.startsWith('/auth/email/')){requests.push({path,body:route.request().postDataJSON()});body={ok:true,delivery:'email'};if(fail){status=400;body={message:'連結無效或已過期'};}}
   await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
  });
  for(const portal of ['student','teacher','admin']){
@@ -61,7 +61,7 @@ async page=>{
  await page.evaluate(async()=>{const {mountMailboxes}=await import('/src/mailboxes.js');const host=document.createElement('section');host.id='mail-test';document.body.append(host);window.mailVerified=0;mountMailboxes(host,null,()=>window.mailVerified++);});
  await page.locator('[data-mail-request]').waitFor();await page.locator('[data-mail-request]').click();
  await page.locator('[data-mail-verify]').waitFor({state:'visible'});
- check(await page.locator('[data-mail-code]').count()===0,'Firebase verification uses link instead of old six-digit code');
+ check(await page.locator('[data-mail-code]').count()===0,'Email verification uses link instead of old six-digit code');
  await page.locator('[data-mail-confirm]').click();
  await page.getByText(/尚未確認驗證完成/).waitFor();
  check(await page.evaluate(()=>window.mailVerified)===0,'Unverified mailbox cannot complete locally');

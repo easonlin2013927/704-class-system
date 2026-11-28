@@ -15,12 +15,12 @@ import {migrateEnhancements,enhancementRoutes,authorizeEnhancedSchoolRoute,publi
 import {migrateSystemCenter} from './system-center.mjs';
 import {createClassroom,markClassPresence} from './classroom.mjs';
 import {createFirebaseAuth,migrateFirebaseAuth} from './firebase-auth.mjs';
-import {createFirebaseEmail,migrateFirebaseEmail} from './firebase-email.mjs';
+import {createAccountEmail,migrateAccountEmail} from './account-email.mjs';
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
 const firebaseAuth=createFirebaseAuth(db);
-const firebaseEmail=createFirebaseEmail(db);
+const accountEmail=createAccountEmail(db);
 const classroom=createClassroom(db);
 const categories = new Set(["important","academic","activity","general"]);
 const themes=new Set(["dark","light","ocean","forest","rose","amber","midnight","slate","notebook","lavender","brick","teal","mono"]);
@@ -49,8 +49,8 @@ await migrateEnhancements();
 await migrateBroadcast();
 await migrateMail();
 await migrateMailboxes();
-await migrateFirebaseEmail(db);
-await db.query("update school_mail_queue set status='cancelled',verification_code=null where kind='verification' and status='pending'");
+await migrateAccountEmail(db);
+await db.query("update school_mail_queue set status='cancelled',verification_code=null,action_link=null where kind='verification' and status='pending' and action_state_hash is null");
 await migrateMailDeliveries();
 await migrateMailEvents();
 await classroom.migrate();
@@ -92,9 +92,9 @@ const server = createServer(async (req,res) => {
  if (path === "/health" && req.method === "GET") { await db.query("select 1"); return send(200,{status:"ok"}); }
  if(req.method==="GET"&&await serveProfileFile(path,res))return;
  if(path==='/public/auth-config'&&req.method==='GET')return send(200,firebaseAuth.config());
- if(path==='/auth/email/password-reset/request'&&req.method==='POST')return send(202,await firebaseEmail.requestReset(await body(req)));
- if(path==='/auth/email/password-reset/confirm'&&req.method==='POST')return send(200,await firebaseEmail.confirmReset(await body(req)));
- if(path==='/auth/email/verify-confirm'&&req.method==='POST')return send(200,await firebaseEmail.confirmVerification(await body(req)));
+ if(path==='/auth/email/password-reset/request'&&req.method==='POST')return send(202,await accountEmail.requestReset(await body(req)));
+ if(path==='/auth/email/password-reset/confirm'&&req.method==='POST')return send(200,await accountEmail.confirmReset(await body(req)));
+ if(path==='/auth/email/verify-confirm'&&req.method==='POST')return send(200,await accountEmail.confirmVerification(await body(req)));
  if(path==='/auth/firebase'&&req.method==='POST'){
  const data=await body(req),binding=await firebaseAuth.login(data);
  const token=randomBytes(32).toString('hex');
@@ -162,15 +162,15 @@ const server = createServer(async (req,res) => {
  if(path==='/school/mail-address'&&req.method==='GET')return send(200,await mailAddress(user));
  if(path==='/school/presence'&&req.method==='POST')return send(200,await markClassPresence(db,user,req.headers['content-length']==='0'||(!req.headers['content-length']&&!req.headers['transfer-encoding'])?{}:await body(req)));
   if(path==='/school/mail-status'&&req.method==='GET'){if(!user.permissions.site_settings)fail(403,'此帳號沒有網站設定權限');return send(200,await mailStatus({...user,role:'admin'}));}
- if(path==='/school/mail-address'&&req.method==='POST'){const b=await body(req),box=(await listMailboxes(user)).find(x=>x.address===String(b.address||'').trim().toLowerCase());if(!box)fail(404,'請先新增通知信箱');return send(202,await firebaseEmail.requestVerification(user,box.id));}
- if(path==='/school/mail-verify'&&req.method==='POST')fail(410,'請使用 Firebase 郵件中的驗證連結');
+ if(path==='/school/mail-address'&&req.method==='POST'){const b=await body(req),box=(await listMailboxes(user)).find(x=>x.address===String(b.address||'').trim().toLowerCase());if(!box)fail(404,'請先新增通知信箱');return send(202,await accountEmail.requestVerification(user,box.id));}
+ if(path==='/school/mail-verify'&&req.method==='POST')fail(410,'請使用 郵件中的驗證連結');
  if(path==='/school/mailboxes'&&req.method==='GET')return send(200,await listMailboxes(user));
  if(path==='/school/mailboxes'&&req.method==='POST'){const b=await body(req);return send(201,await createMailbox(user,b.address));}
  const mailboxMatch=path.match(/^\/school\/mailboxes\/([0-9a-f-]{36})$/i);
  if(mailboxMatch&&req.method==='PATCH'){const b=await body(req);return send(200,await updateMailbox(user,mailboxMatch[1],b.address));}
  if(mailboxMatch&&req.method==='DELETE')return send(200,await deleteMailbox(user,mailboxMatch[1]));
- if(path==='/school/mailbox-request'&&req.method==='POST'){const b=await body(req);return send(202,await firebaseEmail.requestVerification(user,b.id));}
- if(path==='/school/mailbox-confirm'&&req.method==='POST')fail(410,'請使用 Firebase 郵件中的驗證連結');
+ if(path==='/school/mailbox-request'&&req.method==='POST'){const b=await body(req);return send(202,await accountEmail.requestVerification(user,b.id));}
+ if(path==='/school/mailbox-confirm'&&req.method==='POST')fail(410,'請使用 郵件中的驗證連結');
  const adminMailboxMatch=path.match(/^\/school\/mail-admin\/([0-9a-f-]{36})$/i);
   if(adminMailboxMatch&&req.method==='GET'){if(!user.permissions.accounts)fail(403,'此帳號沒有帳號管理權限');return send(200,await listMailboxes({...user,role:'admin'},adminMailboxMatch[1]));}
  if(adminMailboxMatch&&req.method==='POST'){if(user.role!=='admin')fail(403,'僅限管理員');const b=await body(req);return send(201,await createMailbox(user,b.address,adminMailboxMatch[1]));}

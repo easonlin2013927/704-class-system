@@ -2,6 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildMail} from './mail-template.mjs';
 
+test('account action emails use the monochrome action button and 30-minute expiry',()=>{
+ const link='https://example.com/auth-action/?mode=resetPassword&state=state&oobCode=token';
+ for(const action_kind of ['PASSWORD_RESET','VERIFY_EMAIL']){const message=buildMail({verification:true,action_kind,action_link:link});assert.ok(message.text.includes(link));assert.match(message.text,/30 分鐘/);assert.match(message.html,/state=state&amp;oobCode=token/);assert.ok(message.html.includes(action_kind==='PASSWORD_RESET'?'重設系統密碼':'驗證電子郵件'));assert.doesNotMatch(message.html,/六位數|驗證碼：|Firebase/);}
+ assert.doesNotMatch(buildMail({verification:true,action_kind:'PASSWORD_RESET',action_link:'javascript:alert(1)'}).html,/href="javascript:/);
+});
+
 test('all mail variants preserve subject, text, content and monochrome HTML',()=>{
  const variants=[
   [{verification:true,verification_code:'123456'},'驗證你的電子郵件',['123456','5 分鐘']],
